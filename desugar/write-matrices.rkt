@@ -94,14 +94,11 @@
 
 ;; Build X
 
-(define countX 0)
-(define X (make-hash))
+(define X '())
 (define (build-X! l e)
         (when (and (symbol? e) (not (equal? e 'halt)))
-              (when (not (hash-has-key? X e))
-                    (define n countX)
-                    (set! countX (+ countX 1))
-                    (hash-set! X e n))))
+              (when (not (member e X))
+                    (set! X (cons e X)))))
 (iter build-X!)
 
 
@@ -190,12 +187,12 @@
 
 
 ;; Build A from X*T + V
-(define X*T (append* (map (lambda (xk)
+(define X*T (append* (map (lambda (x)
                                   (foldl (lambda (t x*)
-                                                 (cons `(,(hash-ref X xk) ,t) x*))
+                                                 (cons `(,x ,t) x*))
                                          '()
                                          (reverse T)))
-                          (hash-keys X))))
+                          X)))
 
 
 
@@ -258,7 +255,7 @@
 (define lenS (length S))
 (define lenT (length T))
 (define lenCLO (length CLO))
-(define lenX (hash-count X))
+(define lenX (length X))
 
 
 
@@ -316,7 +313,7 @@
 (define (ae->A ael env t)
         (define ae (hash-ref saved ael))
         (cond [(symbol? ae)
-               (define xoff (hash-ref X ae))
+               (define xoff (- lenX (length (member ae X))))
                (define toff (hash-ref T-offs t))
                (+ (* lenT xoff) toff)]
               [(number? ae) (- lenV 1)]  ;;;;;;;;;;; this needs to change as B changes
@@ -586,7 +583,7 @@
                             (define e (hash-ref saved l))
                             (when (< (- i 1) (length (second e))) 
                                   (define ail (list-ref (second e) (- i 1)))
-                                  (define xoff (hash-ref X (hash-ref saved ail)))
+                                  (define xoff (- lenX (length (member (hash-ref saved ail) X))))
                                   (display xoff out)
                                   (display " " out)
                                   (display cV out)

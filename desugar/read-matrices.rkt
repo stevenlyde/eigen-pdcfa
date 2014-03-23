@@ -104,14 +104,11 @@
 
 ;; Build X
 
-(define countX 0)
-(define X (make-hash))
+(define X '())
 (define (build-X! l e)
         (when (and (symbol? e) (not (equal? e 'halt)))
-              (when (not (hash-has-key? X e))
-                    (define n countX)
-                    (set! countX (+ countX 1))
-                    (hash-set! X e n))))
+              (when (not (member e X))
+                    (set! X (cons e X)))))
 (iter build-X!)
 
 
@@ -200,12 +197,12 @@
 
 
 ;; Build A from X*T + V
-(define X*T (append* (map (lambda (xk)
+(define X*T (append* (map (lambda (x)
                                   (foldl (lambda (t x*)
-                                                 (cons `(,(hash-ref X xk) ,t) x*))
+                                                 (cons `(,x ,t) x*))
                                          '()
                                          (reverse T)))
-                          (hash-keys X))))
+                          X)))
 
 
 
@@ -267,11 +264,7 @@
 (define lenS (length S))
 (define lenT (length T))
 (define lenCLO (length CLO))
-(define lenX (hash-count X))
-
-
-(define Xvec (make-vector 9999))
-(void (map (lambda (x) (vector-set! Xvec (hash-ref X x) x)) (hash-keys X)))
+(define lenX (length X))
 
 
 
@@ -299,7 +292,7 @@
       (define addr (list-ref X*T row))
       (define value (list-ref V col))
       
-      (define var (vector-ref Xvec (car addr)))
+      (define var (car addr))
       (define time (cadr addr))
       
       (printf "~a,~a ==> ~a~n" var time value))

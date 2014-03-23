@@ -1,0 +1,86 @@
+#lang racket
+
+
+;; Set the degree of context-sensitivity used
+(define k 0)
+
+
+;; Read the desugared source tree and flatten it, assigning a number to each language form
+
+(define label 0)
+(define saved (make-hash))
+
+(define (save! e)
+        (define l label)
+        (set! label (+ label 1))
+        (hash-set! saved l e)
+        l)
+
+(define (process-input e)
+        (match e
+               [`(prim ,op ,ae* ...)
+                (save! `(prim ,op . ,(map process-input ae*)))]
+               [`(set!/k ,x ,aev ,aek)
+                (save! `(set!/k ,(process-input x) ,(process-input aev) ,(process-input aek)))]
+               [`(if ,ae ,et ,ef)
+                (save! `(if ,(process-input ae) ,(process-input et) ,(process-input ef)))]
+               [`(lambda ,args ,eb)
+                (save! `(lambda ,(map process-input args) ,(process-input eb)))]
+               [`(,ae* ...)
+                (save! (map process-input ae*))]
+               [else (save! e)]))
+
+
+(define root (process-input (read)))
+
+
+
+;; Utility for iterating over the program
+(define (iter callback! [l root])
+        (define e (hash-ref saved l))
+        (callback! l e)
+        (match e
+               [`(prim ,op ,ae* ...)
+                 (map (lambda (l) (iter callback! l)) ae*)]
+               [`(set!/k ,x ,aev ,aek)
+                 (iter callback! x)
+                 (iter callback! aev)
+                 (iter callback! aek)]
+               [`(if ,ae ,et ,ef)
+                 (iter callback! ae)
+                 (iter callback! et)
+                 (iter callback! ef)]
+               [`(lambda ,args ,eb)
+                 (iter callback! eb)
+                 (map (lambda (l) (iter callback! l)) args)]
+               [(? list?)
+                (map (lambda (l) (iter callback! l)) e)]
+               [else (void)])
+        (void))
+
+
+
+;; Build Table X
+
+(define countX 0)
+(define X (make-hash))
+(define (build-X! l e)
+        (when (symbol? e)
+              (when (not (hash-has-key? X e))
+                    (define n countX)
+                    (set! countX (+ countX 1))
+                    (hash-set! X e n))))
+(iter build-X!)
+(pretty-print X)
+
+
+
+
+
+
+
+
+
+
+
+

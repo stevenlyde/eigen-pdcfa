@@ -1,0 +1,48 @@
+r 1 4
+0 0
+
+sigma 7 10
+0 3
+1 4
+2 5
+3 6
+4 7
+5 8
+6 9
+
+Fun 10 4
+4 1
+0 3
+
+CondTrue 4 4
+
+CondFalse 4 4
+
+Tick 1 4
+0 3
+
+Body 4 7
+1 0
+3 1
+2 2
+
+Arg1 10 4
+6 3
+
+Var1 3 7
+0 0
+2 1
+1 2
+
+Call1 1 4
+0 3
+
+If 1 4
+
+Set 1 4
+0 1
+
+PrimInt 1 4
+
+PrimBool 1 4
+

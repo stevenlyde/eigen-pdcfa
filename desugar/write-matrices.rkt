@@ -316,10 +316,10 @@
                (define xoff (- lenX (length (member ae X))))
                (define toff (hash-ref T-offs t))
                (+ (* lenT xoff) toff)]
-              [(number? ae) (- lenV 1)]  ;;;;;;;;;;; this needs to change as B changes
+              [(number? ae) (- lenA 1)]  ;;;;;;;;;;; this needs to change as B changes
               
-              [(equal? ae #t) (- lenV 3)]  ;;;;;;;;;;; this needs to change as B changes 
-              [(equal? ae #f) (- lenV 2)]  ;;;;;;;;;;; this needs to change as B changes 
+              [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
+              [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
               [(and (list? ae) (equal? (first ae) 'lambda))
                (define clooff (find-clo ael env))
                (+ lenX*T clooff)]))

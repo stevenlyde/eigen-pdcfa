@@ -273,6 +273,8 @@
 
 (display "Labels: ")
 (pretty-print saved)
+(display "States: ")
+(pretty-print S)
 (display "Vars: ")
 (pretty-print X)
 (display "Cols/Values: ")

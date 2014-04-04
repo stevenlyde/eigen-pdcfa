@@ -469,7 +469,7 @@
               (define e (hash-ref saved l))
               (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * /)))
                     (display cS out)
-                    (display "0 " out)
+                    (display " 0" out)
                     (newline out))
               (display-PrimINT (+ 1 cS) (cdr remS))))
 (display-PrimINT 0 S)

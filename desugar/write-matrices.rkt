@@ -459,7 +459,7 @@
 
 
 ;; Write table PrimINT
-(display "PrimInt " out)
+(display "PrimNum " out)
 (display lenS out)
 (display " 1" out)
 (newline out)

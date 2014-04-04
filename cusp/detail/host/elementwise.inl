@@ -18,6 +18,7 @@
 
 #include <cusp/format.h>
 #include <cusp/csr_matrix.h>
+#include <cusp/csrb_matrix.h>
 #include <cusp/detail/host/detail/csr.h>
 
 namespace cusp
@@ -69,6 +70,25 @@ void transform_elementwise(const Matrix1& A,
     cusp::detail::host::detail::csr_transform_elementwise(A, B, C, op); 
 }
 
+//////////
+// CSRB //
+//////////
+
+template <typename Matrix1,
+          typename Matrix2,
+          typename Matrix3,
+          typename BinaryFunction>
+void transform_elementwise(const Matrix1& A,
+                           const Matrix2& B,
+                                 Matrix3& C,
+                                 BinaryFunction op,
+                           cusp::csrb_format,
+                           cusp::csrb_format,
+                           cusp::csrb_format)
+{
+    cusp::detail::host::detail::csrb_transform_elementwise(A, B, C, op); 
+}
+
 ///////////
 // Array //
 ///////////
@@ -118,6 +138,35 @@ void transform_elementwise(const Matrix1& A,
     cusp::csr_matrix<IndexType1,ValueType1,cusp::host_memory> A_(A);
     cusp::csr_matrix<IndexType2,ValueType2,cusp::host_memory> B_(B);
     cusp::csr_matrix<IndexType3,ValueType3,cusp::host_memory> C_;
+
+    cusp::detail::host::transform_elementwise(A_, B_, C_, op);
+
+    cusp::convert(C_, C);
+}
+
+//////////////
+// DefaultB //
+//////////////
+
+template <typename Matrix1,
+          typename Matrix2,
+          typename Matrix3,
+          typename BinaryFunction>
+void transform_elementwise(const Matrix1& A,
+                           const Matrix2& B,
+                                 Matrix3& C,
+                                 BinaryFunction op,
+                           sparse_binary_format,
+                           sparse_binary_format,
+                           sparse_binary_format)
+{
+    typedef typename Matrix1::index_type IndexType1;
+    typedef typename Matrix2::index_type IndexType2;
+    typedef typename Matrix3::index_type IndexType3;
+
+    cusp::csrb_matrix<IndexType1,cusp::host_memory> A_(A);
+    cusp::csrb_matrix<IndexType2,cusp::host_memory> B_(B);
+    cusp::csrb_matrix<IndexType3,cusp::host_memory> C_;
 
     cusp::detail::host::transform_elementwise(A_, B_, C_, op);
 

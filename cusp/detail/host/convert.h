@@ -19,6 +19,7 @@
 
 #include <cusp/format.h>
 #include <cusp/csr_matrix.h>
+#include <cusp/csrb_matrix.h>
 #include <cusp/exception.h>
 
 #include <cusp/detail/host/conversion.h>
@@ -87,6 +88,38 @@ void convert(const Matrix1& src, Matrix2& dst,
     cusp::convert(csr, dst);
 }
 
+//////////
+// COOB //
+//////////
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::csrb_format,
+             cusp::coob_format)
+{    cusp::detail::host::csrb_to_coob(src, dst);    }
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::ellb_format,
+             cusp::coob_format)
+{    cusp::detail::host::ellb_to_coob(src, dst);    }
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::hybb_format,
+             cusp::coob_format)
+{    cusp::detail::host::hybb_to_coob(src, dst);    }
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::sparse_binary_format,
+             cusp::coob_format)
+{
+    typedef typename Matrix1::index_type IndexType;
+    cusp::csrb_matrix<IndexType,cusp::host_memory> csrb;
+    cusp::convert(src, csrb);
+    cusp::convert(csrb, dst);
+}
+
 /////////
 // CSR //
 /////////
@@ -113,6 +146,34 @@ void convert(const Matrix1& src, Matrix2& dst,
              cusp::hyb_format,
              cusp::csr_format)
 {    cusp::detail::host::hyb_to_csr(src, dst);    }
+
+//////////
+// CSRB //
+//////////
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::coob_format,
+             cusp::csrb_format)
+{    cusp::detail::host::coob_to_csrb(src, dst);    }
+
+//add diab format...
+// template <typename Matrix1, typename Matrix2>
+// void convert(const Matrix1& src, Matrix2& dst,
+//              cusp::diab_format,
+//              cusp::csrb_format)
+// {    cusp::detail::host::dia_to_csr(src, dst);    }
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::ellb_format,
+             cusp::csrb_format)
+{    cusp::detail::host::ellb_to_csrb(src, dst);    }
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::hybb_format,
+             cusp::csrb_format)
+{    cusp::detail::host::hybb_to_csrb(src, dst);    }
 
 /////////
 // DIA //
@@ -182,6 +243,39 @@ void convert(const Matrix1& src, Matrix2& dst,
     cusp::convert(csr, dst);
 }
 
+//////////
+// ELLB //
+//////////
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::csrb_format,
+             cusp::ellb_format,
+             const float  max_fill  = 3.0,
+             const size_t alignment = 32)
+{
+    const size_t max_entries_per_row = cusp::detail::host::compute_max_entries_per_row(src);
+    
+    const float threshold  = 1e6; // 1M entries
+    const float size       = float(max_entries_per_row) * float(src.num_rows);
+    const float fill_ratio = size / std::max(1.0f, float(src.num_entries));
+
+    if (max_fill < fill_ratio && size > threshold)
+        throw cusp::format_conversion_exception("ell_matrix fill-in would exceed maximum tolerance");
+
+    cusp::detail::host::csrb_to_ellb(src, dst, max_entries_per_row, alignment);
+}
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::sparse_binary_format,
+             cusp::ellb_format)
+{
+    typedef typename Matrix1::index_type IndexType;
+    cusp::csrb_matrix<IndexType,cusp::host_memory> csrb;
+    cusp::convert(src, csrb);
+    cusp::convert(csrb, dst);
+}
+
 /////////
 // HYB //
 /////////
@@ -206,6 +300,31 @@ void convert(const Matrix1& src, Matrix2& dst,
     cusp::csr_matrix<IndexType,ValueType,cusp::host_memory> csr;
     cusp::convert(src, csr);
     cusp::convert(csr, dst);
+}
+
+//////////
+// HYBB //
+//////////
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::csrb_format,
+             cusp::hybb_format,
+             const float  relative_speed      = 3.0,
+             const size_t breakeven_threshold = 4096)
+{
+    const size_t num_entries_per_row = cusp::detail::host::compute_optimal_entries_per_row(src, relative_speed, breakeven_threshold);
+    cusp::detail::host::csrb_to_hybb(src, dst, num_entries_per_row);
+}
+
+template <typename Matrix1, typename Matrix2>
+void convert(const Matrix1& src, Matrix2& dst,
+             cusp::sparse_binary_format,
+             cusp::hybb_format)
+{
+    typedef typename Matrix1::index_type IndexType;
+    cusp::csrb_matrix<IndexType,cusp::host_memory> csrb;
+    cusp::convert(src, csrb);
+    cusp::convert(csrb, dst);
 }
 
 /////////////

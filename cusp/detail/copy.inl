@@ -89,6 +89,36 @@ void copy(const T1& src, T2& dst,
   cusp::copy(src.coo, dst.coo);
 }
 
+//binary matrices
+template <typename T1, typename T2>
+void copy(const T1& src, T2& dst,
+          cusp::coob_format,
+          cusp::coob_format)
+{
+  copy_matrix_dimensions(src, dst);
+  cusp::copy(src.row_indices,    dst.row_indices);
+  cusp::copy(src.column_indices, dst.column_indices);
+}
+
+template <typename T1, typename T2>
+void copy(const T1& src, T2& dst,
+          cusp::ellb_format,
+          cusp::ellb_format)
+{    
+  copy_matrix_dimensions(src, dst);
+  cusp::copy(src.column_indices, dst.column_indices);
+}
+
+template <typename T1, typename T2>
+void copy(const T1& src, T2& dst,
+          cusp::hybb_format,
+          cusp::hybb_format)
+{    
+  copy_matrix_dimensions(src, dst);
+  cusp::copy(src.ell, dst.ell);
+  cusp::copy(src.coo, dst.coo);
+}
+
 template <typename T1, typename T2>
 void copy(const T1& src, T2& dst,
           cusp::array1d_format,

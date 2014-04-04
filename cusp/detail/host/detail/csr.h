@@ -109,6 +109,87 @@ void csr_transform_elementwise(const Matrix1& A,
 } // csr_transform_elementwise
 
 
+template <typename Matrix1,
+          typename Matrix2,
+          typename Matrix3,
+          typename BinaryFunction>
+void csrb_transform_elementwise(const Matrix1& A,
+								const Matrix2& B,
+                                      Matrix3& C,
+                                      BinaryFunction op)
+{
+    //Method that works for duplicate and/or unsorted indices
+
+    typedef typename Matrix3::index_type IndexType;
+    typedef char ValueType;
+
+    cusp::array1d<IndexType,cusp::host_memory>  next(A.num_cols, IndexType(-1));
+    cusp::array1d<ValueType,cusp::host_memory> A_row(A.num_cols, ValueType(0));
+    cusp::array1d<ValueType,cusp::host_memory> B_row(A.num_cols, ValueType(0));
+   
+    cusp::csrb_matrix<IndexType,cusp::host_memory> temp(A.num_rows, A.num_cols, A.num_entries + B.num_entries);
+
+    size_t nnz = 0;
+
+    temp.row_offsets[0] = 0;
+    
+    for(size_t i = 0; i < A.num_rows; i++)
+    {
+        IndexType head   = -2;
+        IndexType length =  0;
+    
+        //add a row of A to A_row
+        IndexType i_start = A.row_offsets[i];
+        IndexType i_end   = A.row_offsets[i + 1];
+        for(IndexType jj = i_start; jj < i_end; jj++)
+        {
+            IndexType j = A.column_indices[jj];
+    
+			A_row[j] += 1;
+			
+            if(next[j] == -1) { next[j] = head; head = j; length++; }
+        }
+    
+        //add a row of B to B_row
+        i_start = B.row_offsets[i];
+        i_end   = B.row_offsets[i + 1];
+        for(IndexType jj = i_start; jj < i_end; jj++)
+        {
+            IndexType j = B.column_indices[jj];
+    
+			B_row[j] += 1;
+			
+            if(next[j] == -1) { next[j] = head; head = j; length++;  }
+        }
+   
+        // scan through columns where A or B has 
+        // contributed a non-zero entry
+        for(IndexType jj = 0; jj < length; jj++)
+        {
+            ValueType result = op(A_row[head], B_row[head]);
+    
+            if(result != 0)
+            {
+                temp.column_indices[nnz] = head;
+                nnz++;
+            }
+    
+            IndexType prev = head;  head = next[head];  next[prev]  = -1;
+
+            A_row[prev] =  0;                             
+            B_row[prev] =  0;
+        }
+
+        temp.row_offsets[i + 1] = nnz;
+    }
+
+    // TODO replace with destructive assignment?
+
+    temp.resize(A.num_rows, A.num_cols, nnz);
+    cusp::copy(temp, C);
+} // csr_transform_elementwise
+
+
 template <typename Array1, typename Array2,
           typename Array3, typename Array4>
 size_t spmm_csr_pass1(const size_t num_rows, const size_t num_cols,

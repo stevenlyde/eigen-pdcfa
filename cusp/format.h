@@ -40,5 +40,13 @@ struct dia_format : public sparse_format {};
 struct ell_format : public sparse_format {};
 struct hyb_format : public sparse_format {};
 
+//binary formats
+struct sparse_binary_format : public known_format {};
+struct coob_format : public sparse_binary_format {};
+struct csrb_format : public sparse_binary_format {};
+struct diab_format : public sparse_binary_format {};
+struct ellb_format : public sparse_binary_format {};
+struct hybb_format : public sparse_binary_format {};
+
 } // end namespace cusp
 

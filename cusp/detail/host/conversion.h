@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cusp/ell_matrix.h>
+#include <cusp/ellb_matrix.h>
 #include <cusp/exception.h>
 
 #include <cusp/detail/host/conversion_utils.h>
@@ -97,6 +98,55 @@ void coo_to_array2d(const Matrix1& src, Matrix2& dst)
 
     for(size_t n = 0; n < src.num_entries; n++)
         dst(src.row_indices[n], src.column_indices[n]) += src.values[n]; //sum duplicates
+}
+
+//////////////////////
+// COOB Conversions //
+//////////////////////
+    
+template <typename Matrix1, typename Matrix2>
+void coob_to_csrb(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+    
+    // compute number of non-zero entries per row of A 
+    thrust::fill(dst.row_offsets.begin(), dst.row_offsets.end(), IndexType(0));
+
+    for (size_t n = 0; n < src.num_entries; n++)
+        dst.row_offsets[src.row_indices[n]]++;
+
+    // cumsum the num_entries per row to get dst.row_offsets[]
+    IndexType cumsum = 0;
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        IndexType temp = dst.row_offsets[i];
+        dst.row_offsets[i] = cumsum;
+        cumsum += temp;
+    }
+    dst.row_offsets[src.num_rows] = cumsum;
+
+    // write Aj,Ax into dst.column_indices
+    for(size_t n = 0; n < src.num_entries; n++)
+    {
+        IndexType row  = src.row_indices[n];
+        IndexType dest = dst.row_offsets[row];
+
+        dst.column_indices[dest] = src.column_indices[n];
+
+        dst.row_offsets[row]++;
+    }
+
+    IndexType last = 0; 
+    for(size_t i = 0; i <= src.num_rows; i++)
+    {
+        IndexType temp = dst.row_offsets[i];
+        dst.row_offsets[i]  = last;
+        last   = temp;
+    }
+
+    //csr may contain duplicates
 }
 
 /////////////////////
@@ -285,6 +335,108 @@ void csr_to_array2d(const Matrix1& src, Matrix2& dst)
             dst(i, src.column_indices[jj]) += src.values[jj]; //sum duplicates
 }
 
+//////////////////////
+// CSRB Conversions //
+//////////////////////
+
+template <typename Matrix1, typename Matrix2>
+void csrb_to_coob(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+   
+    // TODO replace with offsets_to_indices
+    for(size_t i = 0; i < src.num_rows; i++)
+        for(IndexType jj = src.row_offsets[i]; jj < src.row_offsets[i + 1]; jj++)
+            dst.row_indices[jj] = i;
+
+    cusp::copy(src.column_indices, dst.column_indices);
+}
+
+
+template <typename Matrix1, typename Matrix2>
+void csrb_to_hybb(const Matrix1& src, Matrix2& dst,
+				const size_t num_entries_per_row,
+				const size_t alignment = 32)
+{
+    typedef typename Matrix2::index_type IndexType;
+
+    // The ELL portion of the HYB matrix will have 'num_entries_per_row' columns.
+    // Nonzero values that do not fit within the ELL structure are placed in the 
+    // COO format portion of the HYB matrix.
+    
+    // compute number of nonzeros in the ELL and COO portions
+    size_t num_ell_entries = 0;
+    for(size_t i = 0; i < src.num_rows; i++)
+        num_ell_entries += thrust::min<size_t>(num_entries_per_row, src.row_offsets[i+1] - src.row_offsets[i]); 
+
+    IndexType num_coo_entries = src.num_entries - num_ell_entries;
+
+    dst.resize(src.num_rows, src.num_cols, 
+               num_ell_entries, num_coo_entries, 
+               num_entries_per_row, alignment);
+
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+
+    // pad out ELL format with zeros
+    thrust::fill(dst.ell.column_indices.values.begin(), dst.ell.column_indices.values.end(), invalid_index);
+
+    for(size_t i = 0, coo_nnz = 0; i < src.num_rows; i++)
+    {
+        size_t n = 0;
+        IndexType jj = src.row_offsets[i];
+
+        // copy up to num_cols_per_row values of row i into the ELL
+        while(jj < src.row_offsets[i+1] && n < num_entries_per_row)
+        {
+            dst.ell.column_indices(i,n) = src.column_indices[jj];
+            jj++, n++;
+        }
+
+        // copy any remaining values in row i into the COO
+        while(jj < src.row_offsets[i+1])
+        {
+            dst.coo.row_indices[coo_nnz]    = i;
+            dst.coo.column_indices[coo_nnz] = src.column_indices[jj];
+            jj++; coo_nnz++;
+        }
+    }
+}
+
+
+template <typename Matrix1, typename Matrix2>
+void csrb_to_ellb(const Matrix1& src, Matrix2& dst,
+                const size_t num_entries_per_row, const size_t alignment = 32)
+{
+    typedef typename Matrix2::index_type IndexType;
+
+    // compute number of nonzeros
+
+    size_t num_entries = 0;
+    for(size_t i = 0; i < src.num_rows; i++)
+        num_entries += thrust::min<size_t>(num_entries_per_row, src.row_offsets[i+1] - src.row_offsets[i]); 
+
+    dst.resize(src.num_rows, src.num_cols, num_entries, num_entries_per_row, alignment);
+
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+
+    // pad out ELL format with zeros
+    thrust::fill(dst.column_indices.values.begin(), dst.column_indices.values.end(), invalid_index);
+
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        size_t n = 0;
+        IndexType jj = src.row_offsets[i];
+
+        // copy up to num_cols_per_row values of row i into the ELL
+        while(jj < src.row_offsets[i+1] && n < num_entries_per_row)
+        {
+            dst.column_indices(i,n) = src.column_indices[jj];
+            jj++, n++;
+        }
+    }
+}
 
 /////////////////////
 // DIA Conversions //
@@ -410,6 +562,70 @@ void ell_to_csr(const Matrix1& src, Matrix2& dst)
     }
 }
 
+//////////////////////
+// ELLB Conversions //
+//////////////////////
+
+template <typename Matrix1, typename Matrix2>
+void ellb_to_coob(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+    
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+    
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+
+    size_t num_entries = 0;
+
+    const size_t num_entries_per_row = src.column_indices.num_cols;
+
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        for(size_t n = 0; n < num_entries_per_row; n++)
+        {
+            const IndexType j = src.column_indices(i,n);
+
+            if(j != invalid_index)
+            {
+                dst.row_indices[num_entries]    = i;
+                dst.column_indices[num_entries] = j;
+                num_entries++;
+            }
+        }
+    }
+}
+
+template <typename Matrix1, typename Matrix2>
+void ellb_to_csrb(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+    
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+
+    size_t num_entries = 0;
+    dst.row_offsets[0] = 0;
+
+    const size_t num_entries_per_row = src.column_indices.num_cols;
+
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        for(size_t n = 0; n < num_entries_per_row; n++)
+        {
+            const IndexType j = src.column_indices(i,n);
+
+            if(j != invalid_index)
+            {
+                dst.column_indices[num_entries] = j;
+                num_entries++;
+            }
+        }
+
+        dst.row_offsets[i + 1] = num_entries;
+    }
+}
+
 /////////////////////
 // HYB Conversions //
 /////////////////////
@@ -506,6 +722,93 @@ void hyb_to_csr(const Matrix1& src, Matrix2& dst)
     }
 }
 
+//////////////////////
+// HYBB Conversions //
+//////////////////////
+
+template <typename Matrix1, typename Matrix2>
+void hybb_to_coob(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+    
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+
+    const size_t num_entries_per_row = src.ell.column_indices.num_cols;
+
+    size_t num_entries  = 0;
+    size_t coo_progress = 0;
+    
+    // merge each row of the ELL and COO parts into a single COO row
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        // append the i-th row from the ELL part
+        for(size_t n = 0; n < num_entries_per_row; n++)
+        {
+            const IndexType j = src.ell.column_indices(i,n);
+
+            if(j != invalid_index)
+            {
+                dst.row_indices[num_entries]    = i;
+                dst.column_indices[num_entries] = j;
+                num_entries++;
+            }
+        }
+
+        // append the i-th row from the COO part
+        while (coo_progress < src.coo.num_entries && static_cast<size_t>(src.coo.row_indices[coo_progress]) == i)
+        {
+            dst.row_indices[num_entries]    = i;
+            dst.column_indices[num_entries] = src.coo.column_indices[coo_progress];
+            num_entries++;
+            coo_progress++;
+        }
+    }
+}
+
+template <typename Matrix1, typename Matrix2>
+void hybb_to_csrb(const Matrix1& src, Matrix2& dst)
+{
+    typedef typename Matrix2::index_type IndexType;
+    
+    dst.resize(src.num_rows, src.num_cols, src.num_entries);
+
+    const IndexType invalid_index = cusp::ellb_matrix<IndexType, cusp::host_memory>::invalid_index;
+
+    const size_t num_entries_per_row = src.ell.column_indices.num_cols;
+
+    size_t num_entries = 0;
+    dst.row_offsets[0] = 0;
+    
+    size_t coo_progress = 0;
+    
+    // merge each row of the ELL and COO parts into a single CSR row
+    for(size_t i = 0; i < src.num_rows; i++)
+    {
+        // append the i-th row from the ELL part
+        for(size_t n = 0; n < num_entries_per_row; n++)
+        {
+            const IndexType j = src.ell.column_indices(i,n);
+
+            if(j != invalid_index)
+            {
+                dst.column_indices[num_entries] = j;
+                num_entries++;
+            }
+        }
+
+        // append the i-th row from the COO part
+        while (coo_progress < src.coo.num_entries && static_cast<size_t>(src.coo.row_indices[coo_progress]) == i)
+        {
+            dst.column_indices[num_entries] = src.coo.column_indices[coo_progress];
+            num_entries++;
+            coo_progress++;
+        }
+
+        dst.row_offsets[i + 1] = num_entries;
+    }
+}
 
 /////////////////////////
 // Array1d Conversions //

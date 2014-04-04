@@ -11,9 +11,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;; Set the degree of context-sensitivity used
-(define k 1)
-
 
 ;; Read the desugared source tree and flatten it, assigning a number to each language form
 
@@ -60,7 +57,7 @@
                [else `(label ,l ,e)]))
 
 
-(define root (process-input (read program)))
+(define root (process-input (read)))
 
 
 
@@ -92,7 +89,7 @@
 
 
 ; ARGSN
-(define ARGSN 0)
+(define ARGSN 1)
 (define (build-ARGSN! l e)
         (when (not (or (not (list? e))
                        (member (first e) '(prim set!/k if lambda halt))))
@@ -100,6 +97,15 @@
               (when (> (- (length e) 1) 0)
                     (set! ARGSN (max ARGSN (- (length e) 1))))))
 (iter build-ARGSN!)
+
+
+;; Build S
+
+(define S '())
+(define (build-S! l e)
+        (when (and (list? e) (not (equal? (first e) 'lambda)))
+              (set! S (cons l S))))
+(iter build-S!)
 
 
 ;; Build X
@@ -112,35 +118,6 @@
 (iter build-X!)
 
 
-
-;; Build L and T
-
-(define L (set))
-(define (build-L! l e)
-        (when (not (or (not (list? e))
-                       (member (first e) '(prim set!/k if lambda halt))))
-              ; e is a callsite
-              (set! L (set-add L l))))
-(iter build-L!)
-
-(define (gen-T t ck)
-        (if (= ck k)
-            t
-            (gen-T (append* (map (lambda (ts) (foldl (lambda (l ts*)
-                                                             (cons (cons l ts) ts*)) 
-                                                     '() 
-                                                     (set->list L))) 
-                                 t)) 
-                   (+ ck 1))))
-
-(define T (gen-T '(()) 0))
-(define (build-offs off rem [h (hash)])
-        (if (null? rem)
-            h
-            (build-offs (+ 1 off) (cdr rem) (hash-set h (car rem) off))))
-(define T-offs (build-offs 0 T))
-
-
 ;; Build LAM and FREE and V
 
 (define LAM (set))
@@ -149,123 +126,20 @@
               ; e is a lambda-abstraction
               (set! LAM (set-add LAM l))))
 (iter build-LAM!)
-
-(define FREE (make-hash))
-(define (free l [def (set)])
-        (define e (hash-ref saved l))
-        (match e
-               [`(prim ,op ,ae* ...)
-                 (apply set-union (map (lambda (ae) (free ae def)) ae*))]
-               [`(set!/k ,x ,aev ,aek)
-                 (set-union (free x def) (free aev def) (free aek def))]
-               [`(if ,ae ,et ,ef)
-                 (set-union (free ae def) (free et def) (free ef def))]
-               [`(lambda ,args ,eb)
-                 (free eb (set-union def (apply set (map (lambda (arg) (hash-ref saved arg)) args))))]
-               ['(halt) (set)]
-               [(? list?)
-                (apply set-union (map (lambda (ae) (free ae def)) e))] 
-               ['halt (set)]
-               [(? symbol?)
-                (set-subtract (set e) def)] 
-               [else (set)]))
-(define (build-FREE! l e)
-        (when (and (list? e) (equal? (first e) 'lambda))
-              ; e is a lambda-abstraction
-              (hash-set! FREE l (set->list (free l)))))
-(iter build-FREE!)
+(define Llab (set->list LAM))
+(define L (map (lambda (l) (hash-ref saved l)) Llab))
 
 (define B '(VOID TRUE FALSE INT))
-(define (gen-Envs envs frees)
-        (if (null? frees)
-            envs
-            (gen-Envs (append* (map (lambda (env) (foldl (lambda (ts env*)
-                                                                 (cons (hash-set env (car frees) ts) env*)) 
-                                                         '() 
-                                                         T))
-                                    envs))
-                      (cdr frees))))
-(define CLO (foldl (lambda (lam clos) 
-                           (append clos
-                                   (map (lambda (env) `(,lam ,env))
-                                        (gen-Envs `(,(hash)) (hash-ref FREE lam)))))
-                   '()
-                   (set->list LAM)))
-(define CLO-offs (build-offs 0 CLO))
-
-(define V (append CLO B))
+(define V (append L B))
+(define A (append X V))
 
 
-;; Build A from X*T + V
-(define X*T (append* (map (lambda (x)
-                                  (foldl (lambda (t x*)
-                                                 (cons `(,x ,t) x*))
-                                         '()
-                                         (reverse T)))
-                          X)))
-
-
-
-(define A (append X*T V))
-
-
-;; Build C and S
-
-(define C '())
-
-(define (addC! l env)
-        (define envs (gen-Envs `(,(hash)) (set->list (set-intersect env (free l)))))
-        (set! C (append C (map (lambda (env)
-                                                `(,l ,env))
-                                        envs))))
-
-(define (iterC l env)
-        (define e (hash-ref saved l))
-        (match e
-               [`(halt)
-                 (addC! l env)]
-               [`(prim ,op ,ae* ...)
-                 (addC! l env)
-                 (map (lambda (l) (iterC l env)) ae*)]
-               [`(set!/k ,x ,aev ,aek)
-                 (addC! l env)
-                 (iterC x env)
-                 (iterC aev env)
-                 (iterC aek env)]
-               [`(if ,ae ,et ,ef)
-                 (addC! l env)
-                 (iterC ae env)
-                 (iterC et env)
-                 (iterC ef env)]
-               [`(lambda ,args ,eb)
-                 (iterC eb (foldl (lambda (arg env+) (set-add env+ (hash-ref saved arg))) env args))]
-               [(? list?)
-                 (addC! l env)
-                 (map (lambda (l) (iterC l env)) e)]
-               [else (void)])
-        (void))
-(iterC root (set))
-
-(define S (append* (map (lambda (c)
-                                (foldl (lambda (t s*)
-                                               (cons (append c `(,t)) s*))
-                                       '()
-                                       (reverse T)))
-                        C)))
-
-(define C-offs (build-offs 0 C))
-(define S-offs (build-offs 0 S))
 
 ; lengths
-(define lenV (length V))
-(define lenX*T (length X*T))
-(define lenA (length A))
-(define lenC (length C))
-(define lenS (length S))
-(define lenT (length T))
-(define lenCLO (length CLO))
-(define lenX (length X))
-
+(define lenV (length V)) 
+(define lenA (length A)) 
+(define lenS (length S)) 
+(define lenX (length X)) 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -273,31 +147,19 @@
 
 (display "Labels: ")
 (pretty-print saved)
-(display "States: ")
-(pretty-print S)
-(display "Vars: ")
-(pretty-print X)
-(display "Cols/Values: ")
-(pretty-print V)
-(display "Rows/Addrs: ")
-(pretty-print A)
-(newline)
 (newline)
 
 (define (print-store in)
-  (define col (read in))
-  (when (not (eof-object? col))
-    (define row (read in))
+  (define row (read in))
+  (when (not (eof-object? row))
+    (define col (read in))
     
     ; should only print if row < (length X*T)
-    (when (< row lenX*T)
-      (define addr (list-ref X*T row))
+    (when (< row lenX)
+      (define x (list-ref X row))
       (define value (list-ref V col))
       
-      (define var (car addr))
-      (define time (cadr addr))
-      
-      (printf "~a,~a ==> ~a~n" var time value))
+      (printf "~a ==> ~a ~n" x value))
     
     (print-store in)))
 

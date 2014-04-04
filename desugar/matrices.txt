@@ -1,45 +1,58 @@
-r 1 2
+r 1 4
 0 0
 
-sigma 5 6
+sigma 7 10
+0 3
+1 4
+2 5
+3 6
+4 7
+5 8
+6 9
+
+Fun 10 4
+3 0
+4 1
+2 2
+
+CondTrue 4 4
+
+CondFalse 4 4
+
+Tick 1 4
+0 0
+0 1
+0 2
+
+Body 4 7
+1 0
+3 1
+2 2
+
+Arg2 10 4
+5 1
+
+Arg1 10 4
+2 1
+9 2
+
+Var1 3 7
+2 0
 0 1
 1 2
-2 3
-3 4
-4 5
 
-Fun 6 2
-1 0
+Call1 1 4
+0 2
+
+If 1 4
+
+Set 1 4
 0 1
 
-CondTrue 2 2
+PrimInt 1 4
 
-CondFalse 2 2
+PrimBool 1 4
 
-Tick 1 2
+PrimVoid 1 4
 0 0
-0 1
-
-Body 2 5
-1 0
-
-Arg2 6 2
-
-Arg1 6 2
-
-Var1 1 5
-0 0
-
-Call1 1 2
-
-If 1 2
-
-Set 1 2
-
-PrimInt 1 2
-
-PrimBool 1 2
-0 0
-
-PrimVoid 1 2
 

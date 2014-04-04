@@ -54,8 +54,7 @@ void add(const Matrix1& A,
                Matrix3& C,
          cusp::host_memory,
          cusp::host_memory,
-         cusp::host_memory,
-		 cusp::sparse_format)
+         cusp::host_memory)
 {
     typedef typename Matrix3::value_type ValueType;
     cusp::detail::host::transform_elementwise(A, B, C, thrust::plus<ValueType>());
@@ -69,39 +68,10 @@ void subtract(const Matrix1& A,
                     Matrix3& C,
               cusp::host_memory,
               cusp::host_memory,
-              cusp::host_memory,
-			  cusp::sparse_format)
+              cusp::host_memory)
 {
     typedef typename Matrix3::value_type ValueType;
     cusp::detail::host::transform_elementwise(A, B, C, thrust::minus<ValueType>());
-}
-
-template <typename Matrix1,
-          typename Matrix2,
-          typename Matrix3>
-void add(const Matrix1& A,
-         const Matrix2& B,
-               Matrix3& C,
-         cusp::host_memory,
-         cusp::host_memory,
-         cusp::host_memory,
-		 cusp::sparse_binary_format)
-{
-    cusp::detail::host::transform_elementwise(A, B, C, thrust::plus<char>());
-}
-
-template <typename Matrix1,
-          typename Matrix2,
-          typename Matrix3>
-void subtract(const Matrix1& A,
-              const Matrix2& B,
-                    Matrix3& C,
-              cusp::host_memory,
-              cusp::host_memory,
-              cusp::host_memory,
-			  cusp::sparse_binary_format)
-{
-    cusp::detail::host::transform_elementwise(A, B, C, thrust::minus<char>());
 }
 
 //////////////////

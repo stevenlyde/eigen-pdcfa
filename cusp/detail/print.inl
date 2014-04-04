@@ -49,26 +49,6 @@ void print(const Printable& p, Stream& s, cusp::sparse_format)
 }
 
 template <typename Printable, typename Stream>
-void print(const Printable& p, Stream& s, cusp::coob_format)
-{
-  s << "sparse matrix <" << p.num_rows << ", " << p.num_cols << "> with " << p.num_entries << " entries\n";
-
-  for(size_t n = 0; n < p.num_entries; n++)
-  {
-    s << " " << std::setw(14) << p.row_indices[n];
-    s << " " << std::setw(14) << p.column_indices[n] << "\n";
-  }
-}
-
-template <typename Printable, typename Stream>
-void print(const Printable& p, Stream& s, cusp::sparse_binary_format)
-{
-  // general sparse fallback
-  cusp::coob_matrix<typename Printable::index_type, cusp::host_memory> coo(p);
-  cusp::print(coo, s);
-}
-
-template <typename Printable, typename Stream>
 void print(const Printable& p, Stream& s, cusp::array2d_format)
 {
   s << "array2d <" << p.num_rows << ", " << p.num_cols << ">\n";

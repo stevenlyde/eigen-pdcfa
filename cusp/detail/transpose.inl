@@ -43,16 +43,6 @@ void transpose(const MatrixType1& A, MatrixType2& At,
 	                              typename MatrixType2::memory_space());
 }
 
-//sparse binary format
-template <typename MatrixType1,   typename MatrixType2>
-void transpose(const MatrixType1& A, MatrixType2& At,
-               cusp::coob_format,
-               cusp::coob_format)
-{
-    //cusp::detail::dispatch::transpose_binary(A, At,
-	//                              typename MatrixType2::memory_space());
-}
-
 // convert logical linear index in the (tranposed) destination into a physical index in the source
 template <typename IndexType, typename Orientation1, typename Orientation2>
 struct transpose_index_functor : public thrust::unary_function<IndexType,IndexType>
@@ -121,7 +111,7 @@ void transpose(const MatrixType1& A, MatrixType2& At)
     CUSP_PROFILE_SCOPED();
 
     cusp::detail::transpose(A, At,
-							typename MatrixType1::format(),
+	                    typename MatrixType1::format(),
                             typename MatrixType2::format());
 }
 

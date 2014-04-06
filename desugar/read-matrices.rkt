@@ -57,7 +57,7 @@
                [else `(label ,l ,e)]))
 
 
-(define root (process-input (read)))
+(define root (process-input (read program)))
 
 
 
@@ -126,13 +126,18 @@
               ; e is a lambda-abstraction
               (set! LAM (set-add LAM l))))
 (iter build-LAM!)
-(define Llab (set->list LAM))
-(define L (map (lambda (l) (hash-ref saved l)) Llab))
+(define L (set->list LAM))
 
-(define B '(VOID TRUE FALSE INT))
+(define B '(LIST VOID TRUE FALSE INT))
 (define V (append L B))
 (define A (append X V))
 
+
+(define allprims (set))
+(define (build-allprims! l e)
+        (when (and (list? e) (equal? (first e) 'prim))
+              (set! allprims (set-add allprims (second e)))))
+(iter build-allprims!)
 
 
 ; lengths
@@ -140,6 +145,7 @@
 (define lenA (length A)) 
 (define lenS (length S)) 
 (define lenX (length X)) 
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

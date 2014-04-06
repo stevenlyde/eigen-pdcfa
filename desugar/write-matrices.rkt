@@ -117,10 +117,16 @@
 (iter build-LAM!)
 (define L (set->list LAM))
 
-(define B '(VOID TRUE FALSE INT))
+(define B '(LIST VOID TRUE FALSE INT))
 (define V (append L B))
 (define A (append X V))
 
+
+(define allprims (set))
+(define (build-allprims! l e)
+        (when (and (list? e) (equal? (first e) 'prim))
+              (set! allprims (set-add allprims (second e)))))
+(iter build-allprims!)
 
 
 ; lengths
@@ -142,6 +148,11 @@
 ;(pretty-print T)
 ;(pretty-print V)
 ;(pretty-print root)
+
+
+
+; print out all prims
+(pretty-print allprims)
 
 
 
@@ -486,7 +497,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal?)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal? null? not and or)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -505,7 +516,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (equal? (second e) 'void))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(void print)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -513,6 +524,26 @@
 (display-PrimVoid 0 S)
 (newline out)
 (pretty-print 0)
+
+
+
+;; Write table PrimLIST
+(display "PrimList " out)
+(display lenS out)
+(display " 1" out)
+(newline out)
+(define (display-PrimList cS remS)
+        (when (not (null? remS))
+              (define l (car remS))
+              (define e (hash-ref saved l))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(list append cons cdr car)))
+                    (display cS out)
+                    (display " 0" out)
+                    (newline out))
+              (display-PrimList (+ 1 cS) (cdr remS))))
+(display-PrimList 0 S)
+(newline out)
+(pretty-print 1)
 
 
 

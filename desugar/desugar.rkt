@@ -313,7 +313,7 @@
 ; Read from stdin, translate, and print to stdout
 ;(display (simplify (collapse-defines (read))))
 (pretty-write
-  (alpha-rename
+  ;(alpha-rename
     (cps-convert
       (anf-convert
         (simplify
@@ -323,7 +323,7 @@
         )
       )
     )
-  )
+  ;)
 )
 (newline)
 

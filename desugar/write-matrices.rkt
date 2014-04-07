@@ -430,7 +430,7 @@
 ;; Write Tables Call_i
 (define (write-calli i)
         (display "Call" out)
-        (display i out)
+        (display (- i 1) out)
         (display " " out)
         (display lenS out)
         (display " 1" out)
@@ -441,14 +441,14 @@
                       (define e (hash-ref saved l))
                       (when (and (not (or (not (list? e))
                                           (member (first e) '(prim set!/k if lambda halt))))
-                                 (= i (- (length e) 1)))
+                                 (= (- i 1) (- (length e) 1)))
                             (display cS out)
                             (display " 0" out)
                             (newline out))
                       (display-Call (+ 1 cS) (cdr remS))))
         (display-Call 0 S)
         (newline out))
-(forupto write-calli ARGSN)
+(forupto write-calli (+ 1 ARGSN))
 (pretty-print 4)
 
 

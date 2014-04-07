@@ -88,6 +88,17 @@
 (iter build-ARGSN!)
 
 
+; primlistmax
+(define primlistops '(list append cons cdr car))
+(define primlistmax 0)
+(define (build-primlistmax! l e)
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              ; e is a primlist
+              (when (> (- (length e) 3) 0)
+                    (set! primlistmax (max primlistmax (- (length e) 3))))))
+(iter build-primlistmax!)
+
+
 ;; Build S
 
 (define S '())
@@ -152,7 +163,10 @@
 
 
 ; print out all prims
-(pretty-print allprims)
+;(pretty-print allprims)
+
+;(pretty-print saved)
+;(pretty-print (list-ref V 96))
 
 
 
@@ -535,21 +549,28 @@
 
 
 ;; Write table PrimLIST
-(display "PrimList " out)
-(display lenS out)
-(display " 1" out)
-(newline out)
-(define (display-PrimList cS remS)
-        (when (not (null? remS))
-              (define l (car remS))
-              (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(list append cons cdr car)))
-                    (display cS out)
-                    (display " 0" out)
-                    (newline out))
-              (display-PrimList (+ 1 cS) (cdr remS))))
-(display-PrimList 0 S)
-(newline out)
+(define (write-primlisti i)
+        (display "PrimList" out)
+        (display (- i 1) out)
+        (display " " out)
+        (display lenS out)
+        (display " 1" out)
+        (newline out)
+        (define (display-PrimList cS remS)
+                (when (not (null? remS))
+                      (define l (car remS))
+                      (define e (hash-ref saved l))
+                      (when (and (list? e) 
+                                 (equal? (first e) 'prim) 
+                                 (member (second e) primlistops)
+                                 (= (- i 1) (- (length e) 3)))
+                            (display cS out)
+                            (display " 0" out)
+                            (newline out))
+                      (display-PrimList (+ 1 cS) (cdr remS))))
+        (display-PrimList 0 S)
+        (newline out))
+(forupto write-primlisti (+ 1 primlistmax))
 (pretty-print 1)
 
 

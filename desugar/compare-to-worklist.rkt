@@ -174,7 +174,7 @@
 
 
 (define (delta op aevs)
-        (match (case op ((+ - * /) 'NUM) ((void print) 'VOID) ((< > <= >= = null? equal? not) 'BOOL) ((list append cons cdr car) 'LIST))
+        (match (case op ((+ - * / sqrt expt max min) 'NUM) ((void print pretty-print) 'VOID) ((< > <= >= = null? equal? not) 'BOOL) ((list append cons cdr car) 'LIST))
                ['NUM (set 'INT)]
                ['VOID (set 'VOID)]
                ['BOOL (set 'TRUE 'FALSE)]

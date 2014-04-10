@@ -11,7 +11,7 @@
   (member op
    '(+ - / * expt modulo quotient > < >= <= = equal? eq?
      if print string-append string-length substring
-     void 
+     void sqrt pretty-print max min
      list cons null? car cdr append length assq list?
      not number? reverse memq member vector->list
      make-vector vector-length vector-ref vector-set!
@@ -20,7 +20,7 @@
 
 ; input language
 ; --------
-; P := ((D | E) ...)
+; P := ((D | E) ... E)
 ; D := (define (symbol ...) E)
 ;    | (define symbol E)
 ; E := constant
@@ -313,7 +313,7 @@
 ; Read from stdin, translate, and print to stdout
 ;(display (simplify (collapse-defines (read))))
 (pretty-write
-  ;(alpha-rename
+  (alpha-rename
     (cps-convert
       (anf-convert
         (simplify
@@ -323,7 +323,7 @@
         )
       )
     )
-  ;)
+  )
 )
 (newline)
 

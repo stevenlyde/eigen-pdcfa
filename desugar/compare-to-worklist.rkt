@@ -266,8 +266,8 @@
 
 (define sigma (explore (set root) (hash)))
 
-(pretty-print sigma)
-(exit)
+;(pretty-print sigma)
+;(exit)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -289,7 +289,7 @@
       (define x (list-ref X row))
       (define value (list-ref V col))
       
-      (set! msigma (store-join msigma (hash x (set (if (number? value) (hash-ref saved value) value))))))
+      (set! msigma (store-join msigma (hash x (set (if (and (number? value) (list? (hash-ref saved value))) (hash-ref saved value) value))))))
     
     (matrix-store in)))
 

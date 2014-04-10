@@ -151,12 +151,16 @@
 
 
 ; lengths
-(define lenV (length V)) 
-(define lenA (length A)) 
-(define lenS (length S)) 
+(define lenV (length V))
+(define lenA (length A))
+(define lenS (length S))
 (define lenX (length X))
 
 
+
+(display "Labels: ")
+(pretty-print saved)
+(newline)
 
 
 
@@ -210,7 +214,7 @@
                                    clos)]
                              [`(set!/k ,xl ,ae ,aek)
                               (define fv (atomic aek sigma)) 
-                              (define aev (atomic aek sigma)) 
+                              (define aev (atomic ae sigma)) 
                               (define clos (filter (lambda (x) x) 
                                                    (map (lambda (e) (if (and (list? e) 
                                                                              (equal? (first e) 'lambda)
@@ -234,7 +238,7 @@
                              [`(,aef ,aes ...)
                               (define fv (atomic aef sigma)) 
                               (define aevs (map (lambda (ae) (atomic ae sigma)) aes))  
-                              (define clos (filter (lambda (x) x) 
+                              (define clos (filter (lambda (x) x)
                                                    (map (lambda (e) (if (and (list? e) 
                                                                              (equal? (first e) 'lambda)
                                                                              (= (length (second e)) (length aevs)))
@@ -248,7 +252,7 @@
 
 
 (define (explore reachable sigma)
-        ;(pretty-print `(explore ,reachable sigma))
+        ;(pretty-print `(explore ,reachable ,sigma))
         (let* ([updated (foldl (lambda (inc acc) `(,(set-union (first inc) (first acc)) ,(store-join (second inc) (second acc))))
                                `(,reachable ,sigma)
                                (map (lambda (next)
@@ -272,10 +276,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-(display "Labels: ")
-(pretty-print saved)
-(newline)
 
 (define msigma (hash))
 

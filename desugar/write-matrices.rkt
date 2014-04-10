@@ -172,7 +172,6 @@
 ;(pretty-print root)
 
 
-
 ; print out all prims
 ;(pretty-print allprims)
 
@@ -204,7 +203,7 @@
         (define ae (hash-ref saved ael))
         (cond [(symbol? ae)
                (- lenX (length (member ae X)))]
-              [(number? ae) (+ lenL (- lenI (length (member ael I))))]
+              [(number? ae) (+ lenX lenL (- lenI (length (member ael I))))]
               [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
               [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
               [(and (list? ae) (equal? (first ae) 'lambda))

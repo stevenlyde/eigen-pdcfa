@@ -128,8 +128,18 @@
 (iter build-LAM!)
 (define L (set->list LAM))
 
+
+(define INTLOCS (set))
+(define (build-INTLOCS! l e)
+        (when (number? e)
+              ; e is a literal
+              (set! INTLOCS (set-add INTLOCS l))))
+(iter build-INTLOCS!)
+(define I (set->list INTLOCS))
+
+
 (define B '(LIST VOID TRUE FALSE INT))
-(define V (append L B))
+(define V (append L I B))
 (define A (append X V))
 
 

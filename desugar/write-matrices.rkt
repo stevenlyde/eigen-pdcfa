@@ -128,8 +128,17 @@
 (iter build-LAM!)
 (define L (set->list LAM))
 
+
+(define INTLOCS (set))
+(define (build-INTLOCS! l e)
+        (when (number? e)
+              ; e is a literal
+              (set! INTLOCS (set-add INTLOCS l))))
+(iter build-INTLOCS!)
+(define I (set->list INTLOCS))
+
 (define B '(LIST VOID TRUE FALSE INT))
-(define V (append L B))
+(define V (append L I B))
 (define A (append X V))
 
 
@@ -142,6 +151,8 @@
 
 ; lengths
 (define lenV (length V)) 
+(define lenI (length I)) 
+(define lenL (length L)) 
 (define lenA (length A)) 
 (define lenS (length S)) 
 (define lenX (length X)) 
@@ -193,7 +204,7 @@
         (define ae (hash-ref saved ael))
         (cond [(symbol? ae)
                (- lenX (length (member ae X)))]
-              [(number? ae) (- lenA 1)]  ;;;;;;;;;;; this needs to change as B changes
+              [(number? ae) (+ lenL (- lenI (length (member ael I))))]
               [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
               [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
               [(and (list? ae) (equal? (first ae) 'lambda))

@@ -76,7 +76,7 @@
         (void))
 
 
-; Valid PrimList ops
+; Valid PrimList opsA
 (define primlistops '(list append cons cdr car))
 
 

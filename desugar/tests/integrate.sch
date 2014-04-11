@@ -24,14 +24,91 @@
            (func (/ (+ (car points) (cdr points)) 2.0))))
 
 
+; a quadrature rule for calculating the area of a slice as a trapazoid
+(define (trapezoidal_rule func points)
+        (let ([a (func (car points))]
+              [b (func (cdr points))])
+             (let ([s (min a b)]
+                   [b (max a b)])
+                  (* (- (cdr points) (car points))
+                     (+ s (/ (- b s) 2.0))))))
+
+
+; a rule for overapproximating based on the largest of two points
+(define (biggest_rule func points)
+        (let ([a (func (car points))]
+              [b (func (cdr points))])
+             (let ([b (max a b)])
+                  (* (- (cdr points) (car points)) b))))
+
+
+; a rule for underapproximating based on the smallest of two points
+(define (smallest_rule func points)
+        (let ([a (func (car points))]
+              [b (func (cdr points))])
+             (let ([s (min a b)])
+                  (* (- (cdr points) (car points)) s))))
 
 
 ; All rules
-(define rules (list midpoint_rule))
+(define rules (list midpoint_rule trapezoidal_rule biggest_rule smallest_rule))
 
 
 ; Some functions to integrate over
 (define funcs (list (lambda (x) (sqrt x))
+                    (lambda (x) (* x x))
+                    (lambda (x) (* x x x))
+                    (lambda (x) (* x x 2))
+                    (lambda (x) (* x x 3))
+                    (lambda (x) (* x 2))
+                    (lambda (x) (* x 3))
+                    (lambda (x) (+ x 1))
+                    (lambda (x) (+ x 2))
+                    (lambda (x) (/ x 3.0))
+                    (lambda (x) (expt x x))
+                    (lambda (x) (- (expt x x) (* x x)))
+                    (lambda (x) 2)
+                    (lambda (x) (+ (* x x) x))
+                    (lambda (x) (- (* x x) x))
+                    (lambda (x) (/ x (* x x)))
+                    (lambda (x) (max (* x x) (sqrt x)))
+                    (lambda (x) (min (* x x) (sqrt x)))(lambda (x) (sqrt x))
+                    (lambda (x) (* x x))
+                    (lambda (x) (* x x x))
+                    (lambda (x) (* x x 2))
+                    (lambda (x) (* x x 3))
+                    (lambda (x) (* x 2))
+                    (lambda (x) (* x 3))
+                    (lambda (x) (+ x 1))
+                    (lambda (x) (+ x 2))
+                    (lambda (x) (/ x 3.0))
+                    (lambda (x) (expt x x))
+                    (lambda (x) (- (expt x x) (* x x)))
+                    (lambda (x) 2)
+                    (lambda (x) (+ (* x x) x))
+                    (lambda (x) (- (* x x) x))
+                    (lambda (x) (/ x (* x x)))
+                    (lambda (x) (max (* x x) (sqrt x)))
+                    (lambda (x) (min (* x x) (sqrt x)))
+                    (lambda (x) (sqrt x))
+                    (lambda (x) (* x x))
+                    (lambda (x) (* x x x))
+                    (lambda (x) (* x x 2))
+                    (lambda (x) (* x x 3))
+                    (lambda (x) (* x 2))
+                    (lambda (x) (* x 3))
+                    (lambda (x) (+ x 1))
+                    (lambda (x) (+ x 2))
+                    (lambda (x) (/ x 3.0))
+                    (lambda (x) (expt x x))
+                    (lambda (x) (- (expt x x) (* x x)))
+                    (lambda (x) 2)
+                    (lambda (x) (+ (* x x) x))
+                    (lambda (x) (- (* x x) x))
+                    (lambda (x) (/ x (* x x)))
+                    (lambda (x) (max (* x x) (sqrt x)))
+                    (lambda (x) (min (* x x) (sqrt x)))
+                    (lambda (x) (sqrt x))
                     (lambda (x) (* x x))
                     (lambda (x) (* x x x))
                     (lambda (x) (* x x 2))

@@ -76,20 +76,25 @@
         (void))
 
 
+; Valid PrimList ops
+(define primlistops '(list append cons cdr car))
+
 
 ; ARGSN
-(define ARGSN 1)
+(define ARGSN 2)
 (define (build-ARGSN! l e)
-        (when (not (or (not (list? e))
-                       (member (first e) '(prim set!/k if lambda halt))))
-              ; e is a callsite
-              (when (> (- (length e) 1) 0)
-                    (set! ARGSN (max ARGSN (- (length e) 1))))))
+        ; e is a primlist
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              (set! ARGSN (max ARGSN (- (length e) 3))))
+        ; e is a callsite
+        (when (and (not (or (not (list? e))
+                            (member (first e) '(prim set!/k if lambda halt))))
+                   (> (- (length e) 1) 0))
+              (set! ARGSN (max ARGSN (- (length e) 1)))))
 (iter build-ARGSN!)
 
 
 ; primlistmax
-(define primlistops '(list append cons cdr car))
 (define primlistmax 0)
 (define (build-primlistmax! l e)
         (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))

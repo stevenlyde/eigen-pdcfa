@@ -300,15 +300,17 @@
 (matrix-store store-matrix)
 
 
+(call-with-output-file "worklist-output.txt" (lambda (port) (pretty-write (foldl (lambda (k h) (hash-set h k (set->list (hash-ref sigma k)))) 
+                                                                                (hash) 
+                                                                                (hash-keys sigma)) 
+                                                           port)
+                                                           (pretty-write (foldl (lambda (k h) (hash-set h k (set->list (hash-ref msigma k)))) 
+                                                                                (hash) 
+                                                                                (hash-keys msigma)) 
+                                                           port))
 
-; Compare the two
-(display "Differences listed below: ")
-(newline)
-(void (map (lambda (k) (when (not (equal? (hash-ref msigma k (lambda () (set))) (hash-ref sigma k (lambda () (set))))) 
-                             (pretty-print `(cpu-sigma ,k ,(hash-ref sigma k (lambda () (set)))))
-                             (pretty-print `(gpu-sigma ,k ,(hash-ref msigma k (lambda () (set)))))
-                             (newline)))
-           (set->list (set-union (list->set (hash-keys msigma)) (list->set (hash-keys sigma))))))
+                                            #:mode 'text #:exists 'replace)
+
 
 
 

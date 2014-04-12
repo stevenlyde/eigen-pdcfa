@@ -9,13 +9,8 @@
 
 
 ; A function for numerical integration over fun: Num -> Num between start and stop with delta precision/step using a quadrature rule
-(define (integrate fun rule start stop delta) 
-        (letrec ([generatepoints (lambda (pointslst)
-                (let ([last (car (car pointslst))])
-                     (if (< last start)
-                         (cdr pointslst)
-                         (generatepoints (cons (cons (- last delta) last) pointslst)))))])
-        (myfold (lambda (pnts sum) (+ sum (rule fun pnts))) 0 (generatepoints (list (cons (- stop delta) stop))))))
+(define (integrate fun rule start stop delta)
+        (myfold (lambda (pnts sum) (+ sum (rule fun pnts))) 0 (list (cons start stop))))
 
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule

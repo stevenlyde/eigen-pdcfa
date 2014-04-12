@@ -14,12 +14,7 @@
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule
 (define (midpoint_rule func points)
-        (* (- (cdr points) (car points))
-           (func (/ (+ (car points) (cdr points)) 2.0))))
-
-
-; All rules
-(define rules (list midpoint_rule))
+        (* (- (cdr points) (car points)) (func (car points))))
 
 
 ; Some functions to integrate over
@@ -27,6 +22,6 @@
                     ))
 
 
-(myfold (lambda (rule na) (myfold (lambda (afunc na) (pretty-print (integrate afunc rule 0.0 2.0 0.001))) na funcs)) (void) rules)
+(myfold (lambda (afunc na) (pretty-print (integrate afunc midpoint_rule 0.0 2.0 0.001))) (void) funcs)
 
 

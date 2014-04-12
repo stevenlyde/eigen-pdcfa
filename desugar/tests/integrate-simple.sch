@@ -12,7 +12,7 @@
         (rule fun))
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule
-(define (midpoint_rule func points)
+(define (midpoint_rule func)
         0)
 
 

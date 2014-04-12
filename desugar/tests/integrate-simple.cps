@@ -50,7 +50,7 @@
                       nn58
                       (lambda (na59)
                         (prim void (lambda (nn60) (nn57 nn60 lamk90))))))
-                   (lambda (func points lamk96) (lamk96 0))))
+                   (lambda (func lamk96) (lamk96 0))))
                 (lambda (na41 lamk97)
                   (prim
                    void

@@ -14,7 +14,7 @@
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule
 (define (midpoint_rule func points)
-        (* (- (cdr points) (car points)) (func (car points))))
+        0)
 
 
 ; All rules

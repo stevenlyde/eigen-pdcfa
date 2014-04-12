@@ -38,7 +38,7 @@
                 nn62
                 (lambda (na63)
                   (prim void (lambda (nn64) (nn61 nn64 lamk83))))))
-             (lambda (fun rule lamk89) (rule fun lamk89))))
+             (lambda (fun rule lamk89) (rule fun 77 lamk89))))
           (lambda (na40 lamk90)
             (prim
              void
@@ -50,7 +50,7 @@
                       nn58
                       (lambda (na59)
                         (prim void (lambda (nn60) (nn57 nn60 lamk90))))))
-                   (lambda (func lamk96) (lamk96 0))))
+                   (lambda (func points lamk96) (lamk96 0))))
                 (lambda (na41 lamk97)
                   (prim
                    void

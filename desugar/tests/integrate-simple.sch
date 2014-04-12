@@ -9,10 +9,10 @@
 
 ; A function for numerical integration over fun: Num -> Num between start and stop with delta precision/step using a quadrature rule
 (define (integrate fun rule)
-        (rule fun))
+        (rule fun 77))
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule
-(define (midpoint_rule func)
+(define (midpoint_rule func points)
         0)
 
 

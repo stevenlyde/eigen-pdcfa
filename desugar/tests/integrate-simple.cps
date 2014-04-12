@@ -1,122 +1,146 @@
 (prim
  void
  (lambda (myfold)
-   ((lambda (nn68)
-      ((lambda (nn73)
+   ((lambda (nn74)
+      ((lambda (nn79)
          (set!/k
           myfold
-          nn73
-          (lambda (na74)
-            (prim void (lambda (nn75) (nn68 nn75 (lambda (v) (halt))))))))
-       (lambda (foldf acc lst lamk81)
+          nn79
+          (lambda (na80)
+            (prim void (lambda (nn81) (nn74 nn81 (lambda (v) (halt))))))))
+       (lambda (foldf acc lst lamk87)
          (prim
           null?
           lst
-          (lambda (nn69)
-            (if nn69
-              (lamk81 acc)
+          (lambda (nn75)
+            (if nn75
+              (lamk87 acc)
               (prim
                car
                lst
-               (lambda (nn70)
+               (lambda (nn76)
                  (foldf
-                  nn70
+                  nn76
                   acc
-                  (lambda (nn71)
+                  (lambda (nn77)
                     (prim
                      cdr
                      lst
-                     (lambda (nn72) (myfold foldf nn71 nn72 lamk81)))))))))))))
-    (lambda (na39 lamk86)
+                     (lambda (nn78) (myfold foldf nn77 nn78 lamk87)))))))))))))
+    (lambda (na39 lamk92)
       (prim
        void
        (lambda (integrate)
-         ((lambda (nn60)
-            ((lambda (nn65)
+         ((lambda (nn66)
+            ((lambda (nn71)
                (set!/k
                 integrate
-                nn65
-                (lambda (na66)
-                  (prim void (lambda (nn67) (nn60 nn67 lamk86))))))
-             (lambda (fun rule start stop delta lamk92)
-               ((lambda (nn62)
+                nn71
+                (lambda (na72)
+                  (prim void (lambda (nn73) (nn66 nn73 lamk92))))))
+             (lambda (fun rule start stop delta lamk98)
+               ((lambda (nn68)
                   (prim
                    cons
                    start
                    stop
-                   (lambda (nn63)
+                   (lambda (nn69)
                      (prim
                       list
-                      nn63
-                      (lambda (nn64) (myfold nn62 0 nn64 lamk92))))))
-                (lambda (pnts sum lamk96)
-                  (rule fun pnts (lambda (nn61) (prim + sum nn61 lamk96))))))))
-          (lambda (na40 lamk98)
+                      nn69
+                      (lambda (nn70) (myfold nn68 0 nn70 lamk98))))))
+                (lambda (pnts sum lamk102)
+                  (rule
+                   fun
+                   pnts
+                   (lambda (nn67) (prim + sum nn67 lamk102))))))))
+          (lambda (na40 lamk104)
             (prim
              void
              (lambda (midpoint_rule)
-               ((lambda (nn51)
-                  ((lambda (nn57)
+               ((lambda (nn57)
+                  ((lambda (nn63)
                      (set!/k
                       midpoint_rule
-                      nn57
-                      (lambda (na58)
-                        (prim void (lambda (nn59) (nn51 nn59 lamk98))))))
-                   (lambda (func points lamk104)
+                      nn63
+                      (lambda (na64)
+                        (prim void (lambda (nn65) (nn57 nn65 lamk104))))))
+                   (lambda (func points lamk110)
                      (prim
                       cdr
                       points
-                      (lambda (nn52)
+                      (lambda (nn58)
                         (prim
                          car
                          points
-                         (lambda (nn53)
+                         (lambda (nn59)
                            (prim
                             -
-                            nn52
-                            nn53
-                            (lambda (nn54)
+                            nn58
+                            nn59
+                            (lambda (nn60)
                               (prim
                                car
                                points
-                               (lambda (nn55)
+                               (lambda (nn61)
                                  (func
-                                  nn55
-                                  (lambda (nn56)
-                                    (prim * nn54 nn56 lamk104))))))))))))))
-                (lambda (na41 lamk110)
+                                  nn61
+                                  (lambda (nn62)
+                                    (prim * nn60 nn62 lamk110))))))))))))))
+                (lambda (na41 lamk116)
                   (prim
                    void
-                   (lambda (funcs)
-                     ((lambda (nn46)
-                        ((lambda (nn47)
-                           (prim
-                            list
-                            nn47
-                            (lambda (nn48)
-                              (set!/k
-                               funcs
-                               nn48
-                               (lambda (na49)
+                   (lambda (rules)
+                     ((lambda (nn53)
+                        (prim
+                         list
+                         midpoint_rule
+                         (lambda (nn54)
+                           (set!/k
+                            rules
+                            nn54
+                            (lambda (na55)
+                              (prim
+                               void
+                               (lambda (nn56) (nn53 nn56 lamk116))))))))
+                      (lambda (na42 lamk122)
+                        (prim
+                         void
+                         (lambda (funcs)
+                           ((lambda (nn48)
+                              ((lambda (nn49)
+                                 (prim
+                                  list
+                                  nn49
+                                  (lambda (nn50)
+                                    (set!/k
+                                     funcs
+                                     nn50
+                                     (lambda (na51)
+                                       (prim
+                                        void
+                                        (lambda (nn52)
+                                          (nn48 nn52 lamk122))))))))
+                               (lambda (x lamk129) (prim sqrt x lamk129))))
+                            (lambda (na43 lamk130)
+                              ((lambda (nn46)
                                  (prim
                                   void
-                                  (lambda (nn50) (nn46 nn50 lamk110))))))))
-                         (lambda (x lamk117) (prim sqrt x lamk117))))
-                      (lambda (na42 lamk118)
-                        ((lambda (nn44)
-                           (prim
-                            void
-                            (lambda (nn45) (myfold nn44 nn45 funcs lamk118))))
-                         (lambda (afunc na lamk121)
-                           (integrate
-                            afunc
-                            midpoint_rule
-                            0.0
-                            2.0
-                            0.001
-                            (lambda (nn43)
-                              (prim
-                               pretty-print
-                               nn43
-                               lamk121)))))))))))))))))))))
+                                  (lambda (nn47)
+                                    (myfold nn46 nn47 rules lamk130))))
+                               (lambda (rule na lamk133)
+                                 ((lambda (nn45)
+                                    (myfold nn45 na funcs lamk133))
+                                  (lambda (afunc na lamk135)
+                                    (integrate
+                                     afunc
+                                     rule
+                                     0.0
+                                     2.0
+                                     0.001
+                                     (lambda (nn44)
+                                       (prim
+                                        pretty-print
+                                        nn44
+                                        lamk135)))))))))))))))))))))))))))
 

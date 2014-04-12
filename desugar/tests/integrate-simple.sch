@@ -17,11 +17,15 @@
         (* (- (cdr points) (car points)) (func (car points))))
 
 
+; All rules
+(define rules (list midpoint_rule))
+
+
 ; Some functions to integrate over
 (define funcs (list (lambda (x) (sqrt x))
                     ))
 
 
-(myfold (lambda (afunc na) (pretty-print (integrate afunc midpoint_rule 0.0 2.0 0.001))) (void) funcs)
+(myfold (lambda (rule na) (myfold (lambda (afunc na) (pretty-print (integrate afunc rule 0.0 2.0 0.001))) na funcs)) (void) rules)
 
 

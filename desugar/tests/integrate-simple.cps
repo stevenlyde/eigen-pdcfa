@@ -1,52 +1,34 @@
 (prim
  void
  (lambda (myfold)
-   ((lambda (nn46)
-      ((lambda (nn51)
+   ((lambda (nn42)
+      ((lambda (nn47)
          (set!/k
           myfold
-          nn51
-          (lambda (na52)
-            (prim void (lambda (nn53) (nn46 nn53 (lambda (v) (halt))))))))
-       (lambda (foldf acc lst lamk59)
+          nn47
+          (lambda (na48)
+            (prim void (lambda (nn49) (nn42 nn49 (lambda (v) (halt))))))))
+       (lambda (foldf acc lst lamk55)
          (prim
           null?
           lst
-          (lambda (nn47)
-            (if nn47
-              (lamk59 acc)
+          (lambda (nn43)
+            (if nn43
+              (lamk55 acc)
               (prim
                car
                lst
-               (lambda (nn48)
+               (lambda (nn44)
                  (foldf
-                  nn48
+                  nn44
                   acc
-                  (lambda (nn49)
+                  (lambda (nn45)
                     (prim
                      cdr
                      lst
-                     (lambda (nn50) (myfold foldf nn49 nn50 lamk59)))))))))))))
-    (lambda (na39 lamk64)
+                     (lambda (nn46) (myfold foldf nn45 nn46 lamk55)))))))))))))
+    (lambda (na39 lamk60)
       ((lambda (nn40)
-         (quote
-          1
-          (lambda (nn41)
-            (quote
-             2
-             (lambda (nn42)
-               (quote
-                3
-                (lambda (nn43)
-                  (quote
-                   4
-                   (lambda (nn44)
-                     (prim
-                      list
-                      nn41
-                      nn42
-                      nn43
-                      nn44
-                      (lambda (nn45) (myfold nn40 0 nn45 lamk64))))))))))))
-       (lambda (a b lamk71) (prim + a b lamk71)))))))
+         (prim list 1 2 3 4 (lambda (nn41) (myfold nn40 0 nn41 lamk60))))
+       (lambda (a b lamk63) (prim + a b lamk63)))))))
 

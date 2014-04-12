@@ -8,7 +8,7 @@
             (myfold foldf (foldf (car lst) acc) (cdr lst))))
 
 
-(myfold (lambda (a b) (+ a b)) 0 '(1 2 3 4))
+(myfold (lambda (a b) (+ a b)) 0 (list 1 2 3 4))
 
 
 ; A function for numerical integration over fun: Num -> Num between start and stop with delta precision/step using a quadrature rule

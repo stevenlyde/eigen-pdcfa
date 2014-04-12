@@ -173,7 +173,7 @@
 ;(pretty-print CLO)
 ;(pretty-print X)
 ;(pretty-print T)
-;(pretty-print V)
+(pretty-print (hash-ref saved (list-ref S 28))) ;
 ;(pretty-print root)
 
 

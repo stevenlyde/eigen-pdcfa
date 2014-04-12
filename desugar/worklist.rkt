@@ -213,8 +213,8 @@
                                              ,(store-join sigma (hash (hash-ref saved (first (second lam))) (delta op aevs)))))
                                    clos)]
                              [`(set!/k ,xl ,ae ,aek)
-                              (define fv (atomic aek sigma)) 
-                              (define aev (atomic ae sigma)) 
+                              (define fv (atomic aek sigma))
+                              (define aev (atomic ae sigma))
                               (define clos (filter (lambda (x) x) 
                                                    (map (lambda (e) (if (and (list? e) 
                                                                              (equal? (first e) 'lambda)
@@ -246,8 +246,9 @@
                                                                         #f))
                                                         (set->list fv))))
                               (map (lambda (lam)
+                                           (let ([minarg (min (length (second lam)) (length aevs))])
                                            `(,(third lam) 
-                                             ,(store-join sigma (foldl (lambda (xl v h) (hash-set h (hash-ref saved xl) v)) (hash) (second lam) aevs))))
+                                             ,(store-join sigma (foldl (lambda (xl v h) (hash-set h (hash-ref saved xl) v)) (hash) (take (second lam) minarg) (take aevs minarg))))))
                                    clos)])]))
 
 

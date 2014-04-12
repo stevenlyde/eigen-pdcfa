@@ -9,7 +9,8 @@
 
 ; A function for numerical integration over fun: Num -> Num between start and stop with delta precision/step using a quadrature rule
 (define (integrate fun rule start stop delta)
-        (myfold (lambda (pnts sum) (+ sum (rule fun pnts))) 0 (list (cons start stop))))
+        (rule fun (cons start stop)))
+        ;(myfold (lambda (pnts sum) (+ sum (rule fun pnts))) 0 (list (cons start stop))))
 
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule

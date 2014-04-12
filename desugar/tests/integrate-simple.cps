@@ -1,57 +1,46 @@
 (prim
  void
  (lambda (myfold)
-   ((lambda (nn69)
-      ((lambda (nn74)
+   ((lambda (nn66)
+      ((lambda (nn71)
          (set!/k
           myfold
-          nn74
-          (lambda (na75)
-            (prim void (lambda (nn76) (nn69 nn76 (lambda (v) (halt))))))))
-       (lambda (foldf acc lst lamk82)
+          nn71
+          (lambda (na72)
+            (prim void (lambda (nn73) (nn66 nn73 (lambda (v) (halt))))))))
+       (lambda (foldf acc lst lamk79)
          (prim
           null?
           lst
-          (lambda (nn70)
-            (if nn70
-              (lamk82 acc)
+          (lambda (nn67)
+            (if nn67
+              (lamk79 acc)
               (prim
                car
                lst
-               (lambda (nn71)
+               (lambda (nn68)
                  (foldf
-                  nn71
+                  nn68
                   acc
-                  (lambda (nn72)
+                  (lambda (nn69)
                     (prim
                      cdr
                      lst
-                     (lambda (nn73) (myfold foldf nn72 nn73 lamk82)))))))))))))
-    (lambda (na39 lamk87)
+                     (lambda (nn70) (myfold foldf nn69 nn70 lamk79)))))))))))))
+    (lambda (na39 lamk84)
       (prim
        void
        (lambda (integrate)
          ((lambda (nn61)
-            ((lambda (nn66)
+            ((lambda (nn63)
                (set!/k
                 integrate
-                nn66
-                (lambda (na67)
-                  (prim void (lambda (nn68) (nn61 nn68 lamk87))))))
-             (lambda (fun rule start stop delta lamk93)
-               ((lambda (nn63)
-                  (prim
-                   cons
-                   start
-                   stop
-                   (lambda (nn64)
-                     (prim
-                      list
-                      nn64
-                      (lambda (nn65) (myfold nn63 0 nn65 lamk93))))))
-                (lambda (pnts sum lamk97)
-                  (rule fun pnts (lambda (nn62) (prim + sum nn62 lamk97))))))))
-          (lambda (na40 lamk99)
+                nn63
+                (lambda (na64)
+                  (prim void (lambda (nn65) (nn61 nn65 lamk84))))))
+             (lambda (fun rule start stop delta lamk90)
+               (prim cons start stop (lambda (nn62) (rule fun nn62 lamk90))))))
+          (lambda (na40 lamk92)
             (prim
              void
              (lambda (midpoint_rule)
@@ -61,9 +50,9 @@
                       midpoint_rule
                       nn58
                       (lambda (na59)
-                        (prim void (lambda (nn60) (nn57 nn60 lamk99))))))
-                   (lambda (func points lamk105) (lamk105 0))))
-                (lambda (na41 lamk106)
+                        (prim void (lambda (nn60) (nn57 nn60 lamk92))))))
+                   (lambda (func points lamk98) (lamk98 0))))
+                (lambda (na41 lamk99)
                   (prim
                    void
                    (lambda (rules)
@@ -78,8 +67,8 @@
                             (lambda (na55)
                               (prim
                                void
-                               (lambda (nn56) (nn53 nn56 lamk106))))))))
-                      (lambda (na42 lamk112)
+                               (lambda (nn56) (nn53 nn56 lamk99))))))))
+                      (lambda (na42 lamk105)
                         (prim
                          void
                          (lambda (funcs)
@@ -96,18 +85,18 @@
                                        (prim
                                         void
                                         (lambda (nn52)
-                                          (nn48 nn52 lamk112))))))))
-                               (lambda (x lamk119) (prim sqrt x lamk119))))
-                            (lambda (na43 lamk120)
+                                          (nn48 nn52 lamk105))))))))
+                               (lambda (x lamk112) (prim sqrt x lamk112))))
+                            (lambda (na43 lamk113)
                               ((lambda (nn46)
                                  (prim
                                   void
                                   (lambda (nn47)
-                                    (myfold nn46 nn47 rules lamk120))))
-                               (lambda (rule na lamk123)
+                                    (myfold nn46 nn47 rules lamk113))))
+                               (lambda (rule na lamk116)
                                  ((lambda (nn45)
-                                    (myfold nn45 na funcs lamk123))
-                                  (lambda (afunc na lamk125)
+                                    (myfold nn45 na funcs lamk116))
+                                  (lambda (afunc na lamk118)
                                     (integrate
                                      afunc
                                      rule
@@ -118,5 +107,5 @@
                                        (prim
                                         pretty-print
                                         nn44
-                                        lamk125)))))))))))))))))))))))))))
+                                        lamk118)))))))))))))))))))))))))))
 

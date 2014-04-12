@@ -240,8 +240,7 @@
                               (define aevs (map (lambda (ae) (atomic ae sigma)) aes))  
                               (define clos (filter (lambda (x) x)
                                                    (map (lambda (e) (if (and (list? e) 
-                                                                             (equal? (first e) 'lambda)
-                                                                             (= (length (second e)) (length aevs)))
+                                                                             (equal? (first e) 'lambda))
                                                                         e
                                                                         #f))
                                                         (set->list fv))))

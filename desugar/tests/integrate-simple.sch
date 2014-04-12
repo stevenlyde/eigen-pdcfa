@@ -8,11 +8,13 @@
             (myfold foldf (foldf (car lst) acc) (cdr lst))))
 
 ; A function for numerical integration over fun: Num -> Num between start and stop with delta precision/step using a quadrature rule
-(define (integrate fun rule)
-        (rule fun))
+(define (integrate fun rule start stop delta)
+        (rule fun (cons start stop)))
+        ;(myfold (lambda (pnts sum) (+ sum (rule fun pnts))) 0 (list (cons start stop))))
+
 
 ; a function taking a function, pair of points, and a delta, which returns the area of that slice by the midpoint rule
-(define (midpoint_rule func)
+(define (midpoint_rule func points)
         0)
 
 
@@ -25,6 +27,6 @@
                     ))
 
 
-(myfold (lambda (rule na) (myfold (lambda (afunc na) (pretty-print (integrate afunc rule))) na funcs)) (void) rules)
+(myfold (lambda (rule na) (myfold (lambda (afunc na) (pretty-print (integrate afunc rule 0.0 2.0 0.001))) na funcs)) (void) rules)
 
 

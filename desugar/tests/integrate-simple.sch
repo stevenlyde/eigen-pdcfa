@@ -30,8 +30,6 @@
 
 ; Some functions to integrate over
 (define funcs (list (lambda (x) (sqrt x))
-                    (lambda (x) (* x x))
-                    (lambda (x) (* x x x))
                     ))
 
 

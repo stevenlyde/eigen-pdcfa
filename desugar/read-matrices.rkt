@@ -25,6 +25,7 @@
 
 (define (process-input e)
         (match e
+               [`(quote ,s) (save! e)]
                [`(prim ,op ,ae* ...)
                 (save! `(prim ,op . ,(map process-input ae*)))]
                [`(halt)
@@ -42,6 +43,7 @@
 (define (pretty-program [l root])
         (define e (hash-ref saved l))
         (match e
+               [`(quote ,s) `(label ,l ,e)]
                [`(halt)
                 `(label ,l `(halt))]
                [`(prim ,op ,ae* ...)
@@ -57,7 +59,7 @@
                [else `(label ,l ,e)]))
 
 
-(define root (process-input (read program)))
+(define root (process-input (read)))
 
 
 
@@ -66,8 +68,8 @@
         (define e (hash-ref saved l))
         (callback! l e)
         (match e
-               [`(halt)
-                 (void)]
+               [`(quote ,s) (void)]
+               [`(halt) (void)]
                [`(prim ,op ,ae* ...)
                  (map (lambda (l) (iter callback! l)) ae*)]
                [`(set!/k ,x ,aev ,aek)
@@ -87,23 +89,39 @@
         (void))
 
 
+; Valid PrimList opsA
+(define primlistops '(list append cons cdr car reverse memq member vector-ref make-vector))
+
 
 ; ARGSN
-(define ARGSN 1)
+(define ARGSN 2)
 (define (build-ARGSN! l e)
-        (when (not (or (not (list? e))
-                       (member (first e) '(prim set!/k if lambda halt))))
-              ; e is a callsite
-              (when (> (- (length e) 1) 0)
-                    (set! ARGSN (max ARGSN (- (length e) 1))))))
+        ; e is a primlist
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              (set! ARGSN (max ARGSN (- (length e) 3))))
+        ; e is a callsite
+        (when (and (not (or (not (list? e))
+                            (member (first e) '(prim set!/k if lambda halt))))
+                   (> (- (length e) 1) 0))
+              (set! ARGSN (max ARGSN (- (length e) 1)))))
 (iter build-ARGSN!)
+
+
+; primlistmax
+(define primlistmax 0)
+(define (build-primlistmax! l e)
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              ; e is a primlist
+              (when (> (- (length e) 3) 0)
+                    (set! primlistmax (max primlistmax (- (length e) 3))))))
+(iter build-primlistmax!)
 
 
 ;; Build S
 
 (define S '())
 (define (build-S! l e)
-        (when (and (list? e) (not (equal? (first e) 'lambda)))
+        (when (and (list? e) (not (member (first e) '(lambda quote))))
               (set! S (cons l S))))
 (iter build-S!)
 
@@ -137,8 +155,7 @@
 (iter build-INTLOCS!)
 (define I (set->list INTLOCS))
 
-
-(define B '(LIST VOID TRUE FALSE INT))
+(define B '(SYM LIST VOID TRUE FALSE INT))
 (define V (append L I B))
 (define A (append X V))
 
@@ -152,9 +169,12 @@
 
 ; lengths
 (define lenV (length V)) 
+(define lenI (length I)) 
+(define lenL (length L)) 
 (define lenA (length A)) 
 (define lenS (length S)) 
 (define lenX (length X)) 
+
 
 
 

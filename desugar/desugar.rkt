@@ -68,6 +68,8 @@
                ; Quote
                [`(quote ,(? list? eq))
                 `(prim list . ,(map simplify (map (lambda (eq+) `(quote ,eq+)) eq)))]
+               [`(quote ,(? number? n)) n]
+               [`(quote ,(? boolean? b)) b]
           
                ; Lambda 
                [`(lambda ,args ,eb)
@@ -223,6 +225,7 @@
                        [else ae]))
         (define (T-e e k)
                 (match e
+                       [`(quote ,s) `(,k ,(T-ae e))]
                        [`(if ,ae ,et ,ef)
                         `(if ,(T-ae ae) ,(T-e et k) ,(T-e ef k))]
                        [`(set! ,x ,ae)

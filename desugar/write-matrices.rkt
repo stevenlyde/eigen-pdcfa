@@ -14,6 +14,7 @@
 
 (define (process-input e)
         (match e
+               [`(quote ,s) (save! e)]
                [`(prim ,op ,ae* ...)
                 (save! `(prim ,op . ,(map process-input ae*)))]
                [`(halt)
@@ -31,6 +32,7 @@
 (define (pretty-program [l root])
         (define e (hash-ref saved l))
         (match e
+               [`(quote ,s) `(label ,l ,e)]
                [`(halt)
                 `(label ,l `(halt))]
                [`(prim ,op ,ae* ...)
@@ -55,8 +57,8 @@
         (define e (hash-ref saved l))
         (callback! l e)
         (match e
-               [`(halt)
-                 (void)]
+               [`(quote ,s) (void)]
+               [`(halt) (void)]
                [`(prim ,op ,ae* ...)
                  (map (lambda (l) (iter callback! l)) ae*)]
                [`(set!/k ,x ,aev ,aek)
@@ -77,7 +79,7 @@
 
 
 ; Valid PrimList opsA
-(define primlistops '(list append cons cdr car))
+(define primlistops '(list append cons cdr car reverse memq member vector-ref make-vector))
 
 
 ; ARGSN
@@ -108,7 +110,7 @@
 
 (define S '())
 (define (build-S! l e)
-        (when (and (list? e) (not (equal? (first e) 'lambda)))
+        (when (and (list? e) (not (member (first e) '(lambda quote))))
               (set! S (cons l S))))
 (iter build-S!)
 
@@ -142,7 +144,7 @@
 (iter build-INTLOCS!)
 (define I (set->list INTLOCS))
 
-(define B '(LIST VOID TRUE FALSE INT))
+(define B '(SYM LIST VOID TRUE FALSE INT))
 (define V (append L I B))
 (define A (append X V))
 
@@ -173,7 +175,7 @@
 ;(pretty-print CLO)
 ;(pretty-print X)
 ;(pretty-print T)
-(pretty-print (hash-ref saved (list-ref S 28))) ;
+;(pretty-print (hash-ref saved (list-ref S 28)))
 ;(pretty-print root)
 
 
@@ -211,6 +213,7 @@
               [(number? ae) (+ lenX lenL (- lenI (length (member ael I))))]
               [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
               [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
+              [(and (list? ae) (equal? (first ae) 'quote)) (- lenA 6)] ;;;;;;;;;;;;;; this needs to change as B does
               [(and (list? ae) (equal? (first ae) 'lambda))
                (define clooff (find-clo ael))
                (+ lenX clooff)]))
@@ -522,7 +525,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * / sqrt expt max min)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * / sqrt expt max min vector-length length exact->inexact fl+ fl- fl/ fl* flsin)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -541,7 +544,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal? null? not and or)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal? null? not and or fl> fl<)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -560,7 +563,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(void print pretty-print)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(void print pretty-print vector-set!)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))

@@ -525,7 +525,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * / sqrt expt max min vector-length length exact->inexact fl+ fl- fl/ fl* flsin)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * / sqrt expt max min vector-length length exact->inexact fl+ fl- fl/ fl* flsin modulo)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))

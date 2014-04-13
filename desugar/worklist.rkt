@@ -66,7 +66,7 @@
         (define e (hash-ref saved l))
         (callback! l e)
         (match e
-               ;[`(quote ,s) (void)]
+               [`(quote ,s) (void)]
                [`(halt) (void)]
                [`(prim ,op ,ae* ...)
                  (map (lambda (l) (iter callback! l)) ae*)]
@@ -196,7 +196,7 @@
 
 
 (define (delta op aevs)
-        (match (case op ((+ - * / sqrt expt max min exact->inexact fl+ fl- fl/ fl* flsin length vector-length) 'NUM) 
+        (match (case op ((+ - * / sqrt expt max min exact->inexact fl+ fl- fl/ fl* flsin length vector-length modulo) 'NUM) 
                         ((void print pretty-print vector-set!) 'VOID) 
                         ((< > <= >= = null? equal? not fl< fl>) 'BOOL) 
                         ((list append cons cdr car reverse memq member vector-ref make-vector) 'LIST))

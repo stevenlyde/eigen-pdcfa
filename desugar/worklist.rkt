@@ -13,7 +13,6 @@
 
 
 ;; Read the desugared source tree and flatten it, assigning a number to each language form
-
 (define label 0)
 (define saved (make-hash))
 
@@ -58,8 +57,7 @@
                 `(label ,l ,(map pretty-program e))]
                [else `(label ,l ,e)]))
 
-
-(define root (process-input (read)))
+(define root (process-input (read program)))
 
 
 
@@ -68,7 +66,7 @@
         (define e (hash-ref saved l))
         (callback! l e)
         (match e
-               [`(quote ,s) (void)]
+               ;[`(quote ,s) (void)]
                [`(halt) (void)]
                [`(prim ,op ,ae* ...)
                  (map (lambda (l) (iter callback! l)) ae*)]
@@ -275,7 +273,7 @@
 
 
 (define (explore reachable sigma)
-        ;(pretty-print `(explore ,reachable ,sigma))
+        ;(pretty-print `(explore ,reachable sigma))
         (let* ([updated (foldl (lambda (inc acc) `(,(set-union (first inc) (first acc)) ,(store-join (second inc) (second acc))))
                                `(,reachable ,sigma)
                                (map (lambda (next)

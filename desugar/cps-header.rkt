@@ -1,5 +1,6 @@
 #lang racket
 
+(require racket/flonum)
 
 (define-syntax set!/k
     (syntax-rules ()

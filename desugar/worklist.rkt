@@ -191,7 +191,7 @@
                [#f (set 'FALSE)]
                [`(quote ,s) (set 'SYM)]
                [(? number?) (set ael)]
-               [(? symbol?) (hash-ref store ae)]
+               [(? symbol?) (hash-ref store ae (lambda () (set)))]
                [`(lambda ,args ,eb) (set ae)]))
 
 

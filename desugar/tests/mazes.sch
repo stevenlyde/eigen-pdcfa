@@ -185,7 +185,7 @@
 (define make-maze
   (lambda (n m)
     (if (not (and (odd? n) (odd? m)))
-        (print "error")
+        (print 'error)
         (let ((cave
                (make-matrix n m (lambda (i j)
                                   (if (and (even? i) (even? j))
@@ -281,7 +281,7 @@
 (define make-maze2
   (lambda (n m)
     (if (not (and (odd? n) (odd? m)))
-        (print "error")
+        (print 'error)
         (let ((cave
                (make-matrix n m (lambda (i j)
                                   (if (and (even? i) (even? j))

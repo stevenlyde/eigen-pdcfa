@@ -144,8 +144,16 @@
 (iter build-INTLOCS!)
 (define I (set->list INTLOCS))
 
+(define SYMLOCS (set))
+(define (build-SYMLOCS! l e)
+        (when (and (list? e) (equal? (first e) 'quote))
+              ; e is a literal
+              (set! SYMLOCS (set-add SYMLOCS l))))
+(iter build-SYMLOCS!)
+(define SY (set->list SYMLOCS))
+
 (define B '(SYM LIST VOID TRUE FALSE INT))
-(define V (append L I B))
+(define V (append L I SY B))
 (define A (append X V))
 
 
@@ -159,6 +167,7 @@
 ; lengths
 (define lenV (length V)) 
 (define lenI (length I)) 
+(define lenSY (length SY)) 
 (define lenL (length L)) 
 (define lenA (length A)) 
 (define lenS (length S)) 
@@ -213,7 +222,7 @@
               [(number? ae) (+ lenX lenL (- lenI (length (member ael I))))]
               [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
               [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
-              [(and (list? ae) (equal? (first ae) 'quote)) (- lenA 6)] ;;;;;;;;;;;;;; this needs to change as B does
+              [(and (list? ae) (equal? (first ae) 'quote)) (+ lenX lenL lenI (- lenSY (length (member ael SY))))]
               [(and (list? ae) (equal? (first ae) 'lambda))
                (define clooff (find-clo ael))
                (+ lenX clooff)]))

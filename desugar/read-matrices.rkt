@@ -155,8 +155,16 @@
 (iter build-INTLOCS!)
 (define I (set->list INTLOCS))
 
+(define SYMLOCS (set))
+(define (build-SYMLOCS! l e)
+        (when (and (list? e) (equal? (first e) 'quote))
+              ; e is a literal
+              (set! SYMLOCS (set-add SYMLOCS l))))
+(iter build-SYMLOCS!)
+(define SY (set->list SYMLOCS))
+
 (define B '(SYM LIST VOID TRUE FALSE INT))
-(define V (append L I B))
+(define V (append L I SY B))
 (define A (append X V))
 
 

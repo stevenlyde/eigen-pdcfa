@@ -197,7 +197,7 @@
         (match ae
                [#t (set 'TRUE)]
                [#f (set 'FALSE)]
-               [`(quote ,s) (set 'SYM)]
+               [`(quote ,s) (set ael)]
                [(? number?) (set ael)]
                [(? symbol?) (hash-ref store ae (lambda () (set)))]
                [`(lambda ,args ,eb) (set ae)]))
@@ -299,8 +299,8 @@
 
 (define sigma (explore (set root) (hash)))
 
-;(pretty-print sigma)
-;(exit)
+(pretty-print sigma)
+(exit)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

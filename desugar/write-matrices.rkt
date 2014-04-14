@@ -448,7 +448,7 @@
                       (define vl (car remV))
                       (when (hash-has-key? saved vl)
                            (define e (hash-ref saved vl))
-                           (when (and (list? e) (< (- i 1) (length (second e))))
+                           (when (and (list? e) (equal? (first e) 'lambda) (< (- i 1) (length (second e))))
                                  (define ail (list-ref (second e) (- i 1)))
                                  (define xoff (- lenX (length (member (hash-ref saved ail) X))))
                                  (display cV out)

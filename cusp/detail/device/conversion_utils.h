@@ -20,9 +20,7 @@
 #include <cusp/array1d.h>
 #include <cusp/blas.h>
 #include <cusp/coo_matrix.h>
-#include <cusp/coob_matrix.h>
 #include <cusp/csr_matrix.h>
-#include <cusp/csrb_matrix.h>
 
 #include <cusp/detail/format_utils.h>
 

@@ -293,57 +293,6 @@ void sort_by_row_and_column(Array1& rows, Array2& columns, Array3& values)
     }
 }
 
-//binary versions
-template <typename Array1, typename Array2>
-void sort_by_row(Array1& rows, Array2& columns)
-{
-    CUSP_PROFILE_SCOPED();
-
-    typedef typename Array1::value_type IndexType;
-    typedef typename Array1::memory_space MemorySpace;
-        
-    size_t N = rows.size();
-
-    cusp::array1d<IndexType,MemorySpace> permutation(N);
-    thrust::sequence(permutation.begin(), permutation.end());
-  
-    // compute permutation that sorts the rows
-    thrust::sort_by_key(rows.begin(), rows.end(), permutation.begin());
-
-    // copy columns to temporary buffer
-    cusp::array1d<IndexType,MemorySpace> temp1(columns);
-        
-    // use permutation to reorder the columns
-    thrust::gather(permutation.begin(), permutation.end(), temp1.begin(), columns.begin());
-}
-
-template <typename Array1, typename Array2>
-void sort_by_row_and_column(Array1& rows, Array2& columns)
-{
-    CUSP_PROFILE_SCOPED();
-
-    typedef typename Array1::value_type IndexType;
-    typedef typename Array1::memory_space MemorySpace;
-        
-    size_t N = rows.size();
-
-    cusp::array1d<IndexType,MemorySpace> permutation(N);
-    thrust::sequence(permutation.begin(), permutation.end());
-  
-    // compute permutation and sort by (I,J)
-    {
-        cusp::array1d<IndexType,MemorySpace> temp(columns);
-        thrust::stable_sort_by_key(temp.begin(), temp.end(), permutation.begin());
-
-        cusp::copy(rows, temp);
-        thrust::gather(permutation.begin(), permutation.end(), temp.begin(), rows.begin());
-        thrust::stable_sort_by_key(rows.begin(), rows.end(), permutation.begin());
-
-        cusp::copy(columns, temp);
-        thrust::gather(permutation.begin(), permutation.end(), temp.begin(), columns.begin());
-    }
-}
-
 } // end namespace detail
 } // end namespace cusp
 

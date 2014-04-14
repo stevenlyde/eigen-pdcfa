@@ -3,6 +3,7 @@
 #include <thrust/functional.h>
 #include <cusp/detail/functional.h>
 
+//MW: add some OpenMP pragmas
 namespace cusp
 {
 namespace detail
@@ -59,55 +60,6 @@ void spmv_coo(const Matrix&  A,
 }
 
 
-///////////////
-// COOB SpMV //
-///////////////
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2,
-          typename UnaryFunction,
-          typename BinaryFunction1,
-          typename BinaryFunction2>
-void spmv_coob(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y,
-              UnaryFunction   initialize,
-              BinaryFunction1 combine,
-              BinaryFunction2 reduce)
-{
-    typedef typename Matrix::index_type  IndexType;
-    typedef typename Vector2::value_type ValueType;
-
-    for(size_t i = 0; i < A.num_rows; i++)
-        y[i] = initialize(y[i]);
-
-    for(size_t n = 0; n < A.num_entries; n++)
-    {
-        const IndexType& i   = A.row_indices[n];
-        const IndexType& j   = A.column_indices[n];
-        const ValueType& Aij = 1;
-        const ValueType& xj  = x[j];
-
-        y[i] = reduce(y[i], combine(Aij, xj));
-    }
-}
-
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2>
-void spmv_coob(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y)
-{
-	typedef typename Vector2::value_type ValueType;
-	
-	spmv_coob(A, x, y,
-			 cusp::detail::zero_function<ValueType>(),
-             thrust::multiplies<ValueType>(),
-             thrust::plus<ValueType>());
-}
-
-
 //////////////
 // CSR SpMV //
 //////////////
@@ -126,7 +78,8 @@ void spmv_csr(const Matrix&  A,
 {
     typedef typename Matrix::index_type  IndexType;
     typedef typename Vector2::value_type ValueType;
- 
+
+#pragma omp parallel for 
     for(size_t i = 0; i < A.num_rows; i++)
     {
         const IndexType& row_start = A.row_offsets[i];
@@ -158,62 +111,6 @@ void spmv_csr(const Matrix&  A,
     typedef typename Vector2::value_type ValueType;
 
     spmv_csr(A, x, y,
-             cusp::detail::zero_function<ValueType>(),
-             thrust::multiplies<ValueType>(),
-             thrust::plus<ValueType>());
-}
-
-
-///////////////
-// CSRB SpMV //
-///////////////
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2,
-          typename UnaryFunction,
-          typename BinaryFunction1,
-          typename BinaryFunction2>
-void spmv_csrb(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y,
-              UnaryFunction   initialize,
-              BinaryFunction1 combine,
-              BinaryFunction2 reduce)
-{
-    typedef typename Matrix::index_type  IndexType;
-    typedef typename Vector2::value_type ValueType;
- 
-    for(size_t i = 0; i < A.num_rows; i++)
-    {
-        const IndexType& row_start = A.row_offsets[i];
-        const IndexType& row_end   = A.row_offsets[i+1];
- 
-        ValueType accumulator = initialize(y[i]);
- 
-        for (IndexType jj = row_start; jj < row_end; jj++)
-        {
-            const IndexType& j   = A.column_indices[jj];
-            const ValueType& Aij = 1;
-            const ValueType& xj  = x[j];
- 
-            accumulator = reduce(accumulator, combine(Aij, xj));
-        }
- 
-        y[i] = accumulator;
-    }
-}
-
-
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2>
-void spmv_csrb(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y)
-{
-    typedef typename Vector2::value_type ValueType;
-
-    spmv_csrb(A, x, y,
              cusp::detail::zero_function<ValueType>(),
              thrust::multiplies<ValueType>(),
              thrust::plus<ValueType>());
@@ -334,65 +231,6 @@ void spmv_ell(const Matrix&  A,
     typedef typename Vector2::value_type ValueType;
 
     spmv_ell(A, x, y,
-             cusp::detail::zero_function<ValueType>(),
-             thrust::multiplies<ValueType>(),
-             thrust::plus<ValueType>());
-}
-
-
-///////////////
-// ELLB SpMV //
-///////////////
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2,
-          typename UnaryFunction,
-          typename BinaryFunction1,
-          typename BinaryFunction2>
-void spmv_ellb(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y,
-              UnaryFunction   initialize,
-              BinaryFunction1 combine,
-              BinaryFunction2 reduce)
-{
-    typedef typename Matrix::index_type  IndexType;
-    typedef typename Vector2::value_type ValueType;
-
-    const size_t& num_entries_per_row = A.column_indices.num_cols;
-
-    const IndexType invalid_index = Matrix::invalid_index;
-    
-    for(size_t i = 0; i < A.num_rows; i++)
-        y[i] = initialize(y[i]);
-
-    for(size_t n = 0; n < num_entries_per_row; n++)
-    {
-        for(size_t i = 0; i < A.num_rows; i++)
-        {
-            const IndexType& j   = A.column_indices(i, n);
-            const ValueType& Aij = 1;
-
-            if (j != invalid_index)
-            {
-                const ValueType& xj = x[j];
-                y[i] = reduce(y[i], combine(Aij, xj));
-            }
-        }
-    }
-}
-
-
-template <typename Matrix,
-          typename Vector1,
-          typename Vector2>
-void spmv_ellb(const Matrix&  A,
-              const Vector1& x,
-                    Vector2& y)
-{
-    typedef typename Vector2::value_type ValueType;
-
-    spmv_ellb(A, x, y,
              cusp::detail::zero_function<ValueType>(),
              thrust::multiplies<ValueType>(),
              thrust::plus<ValueType>());

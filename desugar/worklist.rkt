@@ -299,8 +299,8 @@
 
 (define sigma (explore (set root) (hash)))
 
-(pretty-print sigma)
-(exit)
+;(pretty-print sigma)
+;(exit)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -318,7 +318,7 @@
       (define x (list-ref X row))
       (define value (list-ref V col))
       
-      (set! msigma (store-join msigma (hash x (set (if (and (number? value) (list? (hash-ref saved value))) (hash-ref saved value) value))))))
+      (set! msigma (store-join msigma (hash x (set (if (and (number? value) (let ([e (hash-ref saved value)]) (and (list? e) (equal? (first e) 'lambda)))) (hash-ref saved value) value))))))
     
     (matrix-store in)))
 

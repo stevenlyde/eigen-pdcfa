@@ -50,8 +50,7 @@ void add(const Matrix1& A,
     cusp::detail::dispatch::add(A, B, C,
             typename Matrix1::memory_space(),
             typename Matrix2::memory_space(),
-            typename Matrix3::memory_space(),
-			typename Matrix3::format());
+            typename Matrix3::memory_space());
 
 }
 
@@ -71,8 +70,7 @@ void subtract(const Matrix1& A,
     cusp::detail::dispatch::subtract(A, B, C,
             typename Matrix1::memory_space(),
             typename Matrix2::memory_space(),
-            typename Matrix3::memory_space(),
-			typename Matrix3::format());
+            typename Matrix3::memory_space());
 }
 
 } // end namespace cusp

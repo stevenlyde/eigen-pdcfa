@@ -21,9 +21,7 @@
 #include <cusp/copy.h>
 #include <cusp/format.h>
 #include <cusp/coo_matrix.h>
-#include <cusp/coob_matrix.h>
 #include <cusp/csr_matrix.h>
-#include <cusp/csrb_matrix.h>
 
 #include <cusp/detail/format_utils.h>
 #include <cusp/detail/device/conversion_utils.h>

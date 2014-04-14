@@ -23,7 +23,6 @@
 
 #include <cusp/array1d.h>
 #include <cusp/csr_matrix.h>
-#include <cusp/csrb_matrix.h>
 
 #include <thrust/count.h>
 
@@ -59,15 +58,6 @@ size_t count_diagonals(const Matrix& csr, cusp::csr_format)
 
 template <typename Matrix>
 size_t compute_max_entries_per_row(const Matrix& csr, cusp::csr_format)
-{
-    size_t max_entries_per_row = 0;
-    for(size_t i = 0; i < csr.num_rows; i++)
-        max_entries_per_row = std::max<size_t>(max_entries_per_row, csr.row_offsets[i+1] - csr.row_offsets[i]); 
-    return max_entries_per_row;
-}
-
-template <typename Matrix>
-size_t compute_max_entries_per_row(const Matrix& csr, cusp::csrb_format)
 {
     size_t max_entries_per_row = 0;
     for(size_t i = 0; i < csr.num_rows; i++)

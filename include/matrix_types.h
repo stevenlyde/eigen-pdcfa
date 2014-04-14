@@ -11,7 +11,6 @@ enum MatrixType
     sigma_prime,
     CondTrue,
     CondFalse,
-    Tick,
     Body,
     Fun,
     Arg,
@@ -28,8 +27,9 @@ enum MatrixType
     not_false_vec,
     false_vec,
     PrimBool,
-    PrimInt,
+    PrimNum,
     PrimVoid,
+    PrimList,
     IF,
     SET
 };
@@ -42,7 +42,6 @@ const char* const MatrixTypeMap[] =
     "sigma_prime",
     "CondTrue",
     "CondFalse",
-    "Tick",
     "Body",
     "Fun",
     "Arg",
@@ -59,8 +58,9 @@ const char* const MatrixTypeMap[] =
     "not_false_vec",
     "false_vec",
     "PrimBool",
-    "PrimInt",
+    "PrimNum",
     "PrimVoid",
+    "PrimList",
     "If",
     "Set"
 };

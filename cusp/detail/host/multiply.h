@@ -18,7 +18,6 @@
 
 #include <cusp/format.h>
 #include <cusp/csr_matrix.h>
-#include <cusp/csrb_matrix.h>
 
 #include <cusp/detail/functional.h>
 
@@ -133,62 +132,6 @@ void multiply(const Matrix&  A,
 
     cusp::detail::host::spmv_ell(A.ell, B, C);
     cusp::detail::host::spmv_coo(A.coo, B, C, thrust::identity<ValueType>(), thrust::multiplies<ValueType>(), thrust::plus<ValueType>());
-}
-
-//////////////////////////////////////////
-// Sparse Binary Matrix-Vector Multiply //
-//////////////////////////////////////////
-template <typename Matrix,
-         typename Vector1,
-         typename Vector2>
-void multiply(const Matrix&  A,
-              const Vector1& B,
-              Vector2& C,
-              cusp::coob_format,
-              cusp::array1d_format,
-              cusp::array1d_format)
-{
-    cusp::detail::host::spmv_coob(A, B, C);
-}
-
-template <typename Matrix,
-         typename Vector1,
-         typename Vector2>
-void multiply(const Matrix&  A,
-              const Vector1& B,
-              Vector2& C,
-              cusp::csrb_format,
-              cusp::array1d_format,
-              cusp::array1d_format)
-{
-    cusp::detail::host::spmv_csrb(A, B, C);
-}
-
-template <typename Matrix,
-         typename Vector1,
-         typename Vector2>
-void multiply(const Matrix&  A,
-              const Vector1& B,
-              Vector2& C,
-              cusp::ellb_format,
-              cusp::array1d_format,
-              cusp::array1d_format)
-{
-    cusp::detail::host::spmv_ellb(A, B, C);
-}
-
-template <typename Matrix,
-         typename Vector1,
-         typename Vector2>
-void multiply(const Matrix&  A,
-              const Vector1& B,
-              Vector2& C,
-              cusp::hybb_format,
-              cusp::array1d_format,
-              cusp::array1d_format)
-{
-    cusp::detail::host::spmv_ellb(A.ell, B, C);
-    cusp::detail::host::spmv_coob(A.coo, B, C);
 }
 
 ////////////////////////////////////////

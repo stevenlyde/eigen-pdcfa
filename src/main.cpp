@@ -1,15 +1,18 @@
-#include "CFA.h"
+#include "utils.h"
 
 // forward declarations
-void runTest( int argc, char** argv);
+void runTest(int argc, char** argv);
+void ParseOptions(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
+	fprintf(stderr, "TEST START\n");
 	//parse command line arguments
-	parseOptions(argc, argv);
+	ParseOptions(argc, argv);
 
-	runTest();
+	runTest(argc, argv);
 
+	fprintf(stderr, "TEST COMPLETE\n");
 	return 0;
 }
 
@@ -26,19 +29,17 @@ void ParseOptions(int argc, char **argv)
 ////////////////////////////////////////////////////////////////////////////////
 //	Parse input file and run test
 ////////////////////////////////////////////////////////////////////////////////
-void runTest()
+void runTest(int argc, char** argv)
 {
-	//Init CFA
-	//filename?
-    CFA Analysis();
+	if(argc != 2)
+	{
+		fprintf(stderr, "Invalid input...\n");
+		fprintf(stderr, "Usage: CFA <testfile>\n");
+		exit(1);
+	}
 
-    StopWatchInterface *timer = 0;
-    sdkCreateTimer( &timer );
-    sdkStartTimer( &timer );
+	std::string filename(argv[1]);
+	CPU_Test(filename);
+//	GPU_Test();
 
-    //CFA tests
-
-    sdkStopTimer( &timer );
-    printf( "Processing time: %f (ms)\n", sdkGetTimerValue( &timer ) );
-    sdkDeleteTimer( &timer );
 }

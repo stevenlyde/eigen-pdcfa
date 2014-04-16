@@ -1,17 +1,14 @@
 
 
+; Home spun foldl which allows us to employ and test additional user-land higher-order functions
+(define (myfold foldf acc lst)
+        (if (null? lst)
+            acc
+            (myfold foldf (foldf (car lst) acc) (cdr lst))))
+
+
 (define symbs '(1 2 a b 3))
 
-(pretty-print symbs)
+(pretty-print (myfold (lambda (s lst) (if (equal? s 'a) (cons 'YAY lst) (cons s lst))) '() symbs))
 
-;(define (fill i)
-;        (if (< i 0)
-;            (void)
-;            (begin (vector-set! vect i 5)
-;                   (fill (- i 1)))))
-                   
-;(fill 9)
 
-;(define a (vector-ref vect 3))
-
-;(pretty-print a)

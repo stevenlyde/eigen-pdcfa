@@ -10,6 +10,15 @@ typedef struct __mat_info
 	int pitch;
 } mat_info;
 
+struct is_non_negative
+{
+	__host__ __device__
+	bool operator()(const int &x)
+	{
+		return (x >= 0);
+	}
+ };
+
 template <typename VALUE_TYPE>
 inline void get_ellmatrix_info(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &mat, mat_info &info)
 {
@@ -67,6 +76,20 @@ inline __device__ void reduce_sum(VALUE_TYPE *a, const int size, const int tID)
 template <typename VALUE_TYPE>
 __launch_bounds__(BLOCK_THREADS,1)
 __global__ void 
+FILL(	VALUE_TYPE *a,
+		const VALUE_TYPE value,
+		const int size)
+{
+	const int tID = blockDim.x * blockIdx.x + threadIdx.x;
+	const int grid_size = blockDim.x * gridDim.x;
+
+	for(int i=tID; i<size; i+=grid_size)
+		a[i] = value;
+}
+
+template <typename VALUE_TYPE>
+__launch_bounds__(BLOCK_THREADS,1)
+__global__ void 
 AND_OP(	const VALUE_TYPE *A,
 		const VALUE_TYPE *B,
 		VALUE_TYPE *C,
@@ -114,7 +137,11 @@ __global__ void AccumVec(	VALUE_TYPE *a,
 
 	//a += b
 	for(int i=tID; i<size; i+=grid_size)
-		a[i] += b[i];
+	{
+		if(b[i])
+			a[i] = 1;
+		//a[i] += b[i];
+	}
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
@@ -161,6 +188,46 @@ column_select(	const 	INDEX_TYPE num_rows,
 
 	const int tID = blockDim.x * blockIdx.x + threadIdx.x;
 	const int grid_size = blockDim.x * gridDim.x;
+
+	const INDEX_TYPE index = s[0];
+
+	for(INDEX_TYPE row=tID; row < num_rows; row+=grid_size)
+	{
+		VALUE_TYPE val = 0;
+		INDEX_TYPE offset = row;
+		for(INDEX_TYPE n=0; n < num_cols_per_row; ++n, offset+=pitch)
+		{
+			INDEX_TYPE col = A_column_indices[offset];
+			if(col != invalid_index && col == index)
+			{
+				val = 1;
+			}
+		}
+
+		y[row] = val;
+	}
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+__launch_bounds__(BLOCK_THREADS,1)
+__global__ void 
+column_select_if(	const INDEX_TYPE num_rows,
+					const INDEX_TYPE num_cols,
+					const INDEX_TYPE num_cols_per_row,
+					const INDEX_TYPE pitch,
+					const INDEX_TYPE *A_column_indices,
+					const VALUE_TYPE *s,
+					const VALUE_TYPE *cond,
+					VALUE_TYPE *y)
+{
+	const INDEX_TYPE invalid_index = cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory>::invalid_index;
+
+	const int tID = blockDim.x * blockIdx.x + threadIdx.x;
+	const int grid_size = blockDim.x * gridDim.x;
+
+	//check conditional value
+	if(cond[0] == 0)
+		return;
 
 	const int index = s[0];
 
@@ -312,10 +379,10 @@ spmv_ellb(	const INDEX_TYPE num_rows,
 {
     const INDEX_TYPE invalid_index = cusp::ell_matrix<int, INDEX_TYPE, cusp::device_memory>::invalid_index;
 
-    const INDEX_TYPE thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    const INDEX_TYPE tID = blockDim.x * blockIdx.x + threadIdx.x;
     const INDEX_TYPE grid_size = gridDim.x * blockDim.x;
 
-    for(INDEX_TYPE row = thread_id; row < num_rows; row += grid_size)
+    for(INDEX_TYPE row=tID; row < num_rows; row += grid_size)
     {
     	VALUE_TYPE sum = 0;
         INDEX_TYPE offset = row;
@@ -443,14 +510,8 @@ ell_add(	const INDEX_TYPE num_rows,
 				//entry_count[tID]++;
 			}
 		}
-
-		// while(c_index < C_num_cols_per_row * C_pitch)
-		// {
-		// 	C_column_indices[c_index] = invalid_index;
-		// 	c_index += C_pitch;
-		// }
 	}
-	__syncthreads();
+	//__syncthreads();
 
 	// reduce_sum<INDEX_TYPE>(entry_count, BLOCK_THREADS, tID);
 	// if(tID == 0)
@@ -460,6 +521,33 @@ ell_add(	const INDEX_TYPE num_rows,
 /////////////////////////////////////////////////////////////////////////
 /////////////////  Entry Wrapper Functions  /////////////////////////////
 /////////////////////////////////////////////////////////////////////////
+template <typename VALUE_TYPE>
+void FILL(	cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
+			const VALUE_TYPE value)
+{
+	const size_t NUM_BLOCKS = BLOCKS;
+	const size_t BLOCK_SIZE = BLOCK_THREADS;
+
+	FILL<VALUE_TYPE> <<<NUM_BLOCKS, BLOCK_SIZE>>> (
+			TPC(&a[0]),
+			value,
+			int(a.size()));
+}
+
+template <typename VALUE_TYPE>
+void FILL(	cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
+			const VALUE_TYPE value,
+			cudaStream_t &stream)
+{
+	const size_t NUM_BLOCKS = BLOCKS;
+	const size_t BLOCK_SIZE = BLOCK_THREADS;
+
+	FILL<VALUE_TYPE> <<<NUM_BLOCKS, BLOCK_SIZE, 0, stream>>> (
+			TPC(&a[0]),
+			value,
+			int(a.size()));
+}
+
 template <typename VALUE_TYPE>
 void AND_OP(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
 			const cusp::array1d<VALUE_TYPE, cusp::device_memory> &b,
@@ -570,6 +658,65 @@ void column_select(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory>
 			infoA.pitch,
 			TPC(&A.column_indices.values[0]),
 			TPC(&s[index]),
+			TPC(&y[0]));
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+void column_select_if(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
+						const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s,
+						const cusp::array1d<VALUE_TYPE, cusp::device_memory> &cond,
+						const INDEX_TYPE index,
+						cusp::array1d<VALUE_TYPE, cusp::device_memory> &y)
+{
+	mat_info infoA;
+	get_ellmatrix_info<VALUE_TYPE> (A, infoA);
+
+#if(DEBUG)
+	assert(infoA.num_cols == s.size());
+	assert(infoA.num_rows == y.size());
+#endif
+
+	const size_t NUM_BLOCKS = BLOCKS;
+	const size_t BLOCK_SIZE = BLOCK_THREADS;
+
+	column_select_if<INDEX_TYPE, VALUE_TYPE> <<<NUM_BLOCKS, BLOCK_SIZE>>> (	
+			infoA.num_rows,
+			infoA.num_cols,
+			infoA.num_cols_per_row,
+			infoA.pitch,
+			TPC(&A.column_indices.values[0]),
+			TPC(&s[index]),
+			TPC(&cond[index]),
+			TPC(&y[0]));
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+void column_select_if(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
+						const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s,
+						const cusp::array1d<VALUE_TYPE, cusp::device_memory> &cond,
+						const INDEX_TYPE index,
+						cusp::array1d<VALUE_TYPE, cusp::device_memory> &y,
+						cudaStream_t &stream)
+{
+	mat_info infoA;
+	get_ellmatrix_info<VALUE_TYPE> (A, infoA);
+
+#if(DEBUG)
+	assert(infoA.num_cols == s.size());
+	assert(infoA.num_rows == y.size());
+#endif
+
+	const size_t NUM_BLOCKS = BLOCKS;
+	const size_t BLOCK_SIZE = BLOCK_THREADS;
+
+	column_select_if<INDEX_TYPE, VALUE_TYPE> <<<NUM_BLOCKS, BLOCK_SIZE, 0, stream>>> (	
+			infoA.num_rows,
+			infoA.num_cols,
+			infoA.num_cols_per_row,
+			infoA.pitch,
+			TPC(&A.column_indices.values[0]),
+			TPC(&s[index]),
+			TPC(&cond[index]),
 			TPC(&y[0]));
 }
 
@@ -782,7 +929,7 @@ void ell_add(	cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &A,
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
-void ell_spmv(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
+void ell_spmv(	const cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &A,
      			const cusp::array1d<VALUE_TYPE, cusp::device_memory> &x,
 				cusp::array1d<VALUE_TYPE, cusp::device_memory> &y)
 {
@@ -808,7 +955,7 @@ void ell_spmv(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
-void ell_spmv(	const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
+void ell_spmv(	const cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &A,
      			const cusp::array1d<VALUE_TYPE, cusp::device_memory> &x,
 				cusp::array1d<VALUE_TYPE, cusp::device_memory> &y,
 				cudaStream_t &stream)

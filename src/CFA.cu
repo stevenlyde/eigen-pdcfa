@@ -90,9 +90,17 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
 		if(PrimList[i].size() != r.size())
 			PrimList[i].resize(r.size(), 0);
 	}
-    a_var.resize(sigma.num_cols, 0);
+#if(BUILD_TYPE == GPU)
+	for(int i=0; i<NUM_STREAMS; ++i)
+	{
+		a_var[i].resize(sigma.num_cols, 0);
+	    vf[i].resize(vec_size, 0);
+	}
+#else
+	a_var.resize(sigma.num_cols, 0);
+	vf.resize(vec_size, 0);
+#endif
     a_set.resize(sigma.num_cols, 0);
-    vf.resize(vec_size, 0);
     v_set.resize(vec_size, 0);
     v_cond.resize(vec_size, 0);
     v_list.resize(vec_size, 0);
@@ -123,22 +131,27 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
     cudaStreamCreate(&stream_Num);
     cudaStreamCreate(&stream_Bool);
     cudaStreamCreate(&stream_Void);
+    entry_count.resize(NUM_STREAMS, 0);
 
-	s_indices.resize(r.size());
-	temp_indices.resize(r.size());
-	temp_r.resize(r.size());
-	Fun_vec.resize(Fun.num_rows);
-	Body_vec.resize(Body.num_rows);
-	Arg_vec.resize(Arg[0].num_rows);
+    //stream_count.resize(thrust::round_i(NUM_STREAMS, 32), 0);
+	temp_indices.resize(r.size(), 0);
+	temp_r.resize(r.size(), 0);
+	for(int i=0; i<NUM_STREAMS; ++i)
+	{
+		s[i].resize(r.size(), 0);
+		s_indices[i].resize(r.size(), 0);
+		Fun_vec[i].resize(Fun.num_rows, 0);
+		Body_vec[i].resize(Body.num_rows, 0);
+		Arg_vec[i].resize(Arg[0].num_rows, 0);
+		accum_var_vec[i].resize(sigma.num_cols);
+		accum_vf_vec[i].resize(vec_size);
+	}
 	Cond_vec.resize(CondTrue.num_rows);
-	accum_var_vec.resize(sigma.num_cols);
-	accum_vf_vec.resize(vec_size);
-	temp_vec.resize(sigma.num_cols);
-	temp_Mat[0].resize(sigma.num_rows, sigma.num_cols, 0, sigma.num_cols/20, 32);
-	temp_Mat[1].resize(sigma.num_rows, sigma.num_cols, 0, sigma.num_cols/20, 32);
-	temp_Mat[2].resize(sigma.num_rows, sigma.num_cols, 0, sigma.num_cols/20, 32);
-	temp_Mat[3].resize(sigma.num_rows, sigma.num_cols, 0, sigma.num_cols/20, 32);
-	temp_Mat[4].resize(sigma.num_rows, sigma.num_cols, 0, sigma.num_cols/20, 32);
+	for(int i=0; i<4*NUM_STREAMS; ++i)
+		temp_Mat[i].resize(sigma.num_rows, sigma.num_cols, 0, std::max(sigma.num_cols/20, ulong(32)), 32);
+	#else
+	s.resize(r.size(), 0);
+	s_indices.resize(r.size(), 0);
 	#endif
 
 	GRID = dim3(1,1,1);
@@ -269,8 +282,6 @@ template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
 void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 {
 	fprintf(stdout, "\n\n\nStarting analysis...\n");
-
-	s.resize(r.size(), 0);
 	r_prime = r;
 	sigma_prime = sigma;
 	int iter=0;
@@ -279,119 +290,99 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 	cusp::ell_matrix<int, INDEX_TYPE, cusp::host_memory> temp_sigma;
 
 	debug = false;
-	double time1=0, time2=0, time3=0, time4=0, time5=0, time6=0, time7=0;
-	double startTime=0, endTime=0;
+	//double time1=0, time2=0, time3=0, time4=0, time5=0, time6=0, time7=0;
+	//double startTime=0, endTime=0;
 
+	//#ifdef _OPENMP
+	//#pragma omp parallel num_threads(1)
 	do
 	{
-		//CPU execution
-		fprintf(stdout, "\n\nITERATION %d\n\n", ++iter);
+		int ID = omp_get_thread_num();
+		if(ID == 0)
+			fprintf(stdout, "\n\nITERATION %d\n\n", ++iter);
 
-		//startTime = omp_get_wtime();
-		//f_call
+		if(iter == 10)
+			debug = true;
+		else
+			debug = false;
+
+#if BUILD_TYPE == GPU
+		// //if(ID == 1)
+		 	f_call();
+		// //if(ID == 2)
+		// 	f_list();
+		// //if(ID == 3)
+			f_set();
+		// //if(ID == 4)
+			f_if();
+		// //if(ID == 5)
+		 	f_primBool();
+		// //if(ID == 6)
+		 	f_primNum();
+		//if(ID == 7)
+			f_primVoid();
+#else
 		f_call();
-		// endTime = omp_get_wtime();
-		// time1 += endTime - startTime;
-		// fprintf(stderr, "time Call: %f\n", time1);
-
-		//startTime = omp_get_wtime();
-		//f_list
-		f_list();
-		// endTime = omp_get_wtime();
-		// time2 += endTime - startTime;
-		// fprintf(stderr, "time List: %f\n", time2);
-
-		//startTime = omp_get_wtime();
-		//f_set
+		// 	f_list();
 		f_set();
-		// endTime = omp_get_wtime();
-		// time3 += endTime - startTime;
-		// fprintf(stderr, "time Set: %f\n", time3);
-
-		//startTime = omp_get_wtime();
-		//f_if
 		f_if();
-		// endTime = omp_get_wtime();
-		// time4 += endTime - startTime;
-		// fprintf(stderr, "time IF: %f\n", time4);
-
-		//startTime = omp_get_wtime();
-		//f_primBool
-		f_primBool();
-		// endTime = omp_get_wtime();
-		// time5 += endTime - startTime;
-		// fprintf(stderr, "time Bool: %f\n", time5);
-
-		//startTime = omp_get_wtime();
-		//f_primNum
-		f_primNum();
-		// endTime = omp_get_wtime();
-		// time6 += endTime - startTime;
-		// fprintf(stderr, "time Num: %f\n", time6);
-
-		//startTime = omp_get_wtime();
-		//f_primVoid
+	 	f_primBool();
+	 	f_primNum();
 		f_primVoid();
-		// endTime = omp_get_wtime();
-		// time7 += endTime - startTime;
-		// fprintf(stderr, "time Void: %f\n", time7);
+#endif
 
-		//correct values...  (this won't be a problem in later versions)
-		// for(int i=0; i<sigma_prime.num_entries; ++i)
-		// 	sigma_prime.values[i] = 1;
-		// for(int i=0; i<r_prime.size(); ++i)
-		// 	if(r_prime[i])
-		// 		r_prime[i] = 1;
+	//#pragma omp barrier
+		if(ID == 0)
+		{
+			fprintf(stdout, "\nupdate sigma\n");
+		#if BUILD_TYPE == GPU
+			//sigma_prime.num_entries = CountEntries(sigma_prime);
 
-		fprintf(stdout, "\nupdate sigma\n");
-		// cusp::subtract(sigma_prime, sigma, temp_Mat[0]);
-		// if(debug)
-		// {
-		//  	fprintf(stdout, "***sigma difference***\n");
-		// 	//cusp::print(temp_Mat[0]);
 
-		// 	temp_sigma = sigma_prime;
-		// 	int num_entries = 0;
-		// 	int pitch = temp_sigma.column_indices.pitch;
-		// 	const INDEX_TYPE invalid_index = cusp::ell_matrix<int, INDEX_TYPE, cusp::device_memory>::invalid_index;
-		// 	for(int col=0; col<temp_sigma.column_indices.num_cols; ++col)
-		// 	{	
-		// 		int offset = pitch*col;
-		// 		for(int row=0; row<temp_sigma.num_rows; ++row, ++offset)
-		// 		{
-		// 			if(temp_sigma.column_indices.values[offset] != invalid_index)
-		// 				num_entries++;
-		// 		}
-		// 	}
-		// 	temp_sigma.num_entries = num_entries;
-		// 	cusp::print(temp_sigma);
-		// }
-		if(sigma.num_entries != sigma_prime.num_entries)
-			sigma_change = true;
-		else
-			sigma_change = false;
+			// cusp::coo_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> temp_sigma;
+			// fprintf(stdout, "***sigma difference***\n");
+			// cusp::subtract(sigma_prime, sigma, temp_sigma);
+			// cusp::print(temp_sigma);
+		#else
+			for(int i=0; i<sigma_prime.num_entries; ++i)
+				sigma_prime.values[i] = 1;
 
-		fprintf(stdout, "\nupdate r\n");
-		int r_entries = thrust::count(r.begin(), r.end(), 1);
-		int r_prime_entries = thrust::count(r_prime.begin(), r_prime.end(), 1);
+			// cusp::coo_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> temp_sigma;
+			// fprintf(stdout, "***sigma difference***\n");
+			// cusp::subtract(sigma_prime, sigma, temp_sigma);
+			// cusp::print(temp_sigma);
+		#endif
+			sigma_prime.num_entries = thrust::count_if(sigma_prime.column_indices.values.begin(), sigma_prime.column_indices.values.end(), is_non_negative());
+			fprintf(stderr, "num_entries: %d  %d\n", sigma.num_entries, sigma_prime.num_entries);
+			if(sigma.num_entries != sigma_prime.num_entries)
+				sigma_change = true;
+			else
+				sigma_change = false;
 
-		//thrust::transform(r.begin(), r.end(), r_prime.begin(), temp_r.begin(), thrust::minus<INDEX_TYPE>());
-		// if(debug)
-		// {
-		// 	fprintf(stdout, "***r difference***\n");
-		// 	cusp::print(temp_r);
-		// 	cusp::print(r_prime);
-		// }
-		if(r_entries != r_prime_entries)
-			r_change = true;
-		else
-			r_change = false;
+			fprintf(stdout, "\nupdate r\n");
+			int r_entries = thrust::count(r.begin(), r.end(), 1);
+			int r_prime_entries = thrust::count(r_prime.begin(), r_prime.end(), 1);
 
-		r = r_prime;
-		sigma = sigma_prime;
-		fprintf(stdout, "end iteration\n");
+			//thrust::transform(r.begin(), r.end(), r_prime.begin(), temp_r.begin(), thrust::minus<INDEX_TYPE>());
+			// if(debug)
+			// {
+			// 	fprintf(stdout, "***r difference***\n");
+			// 	cusp::print(temp_r);
+			// 	cusp::print(r_prime);
+			// }
+			if(r_entries != r_prime_entries)
+				r_change = true;
+			else
+				r_change = false;
 
-	} while(r_change || sigma_change || iter < 1030);
+			r = r_prime;
+			sigma = sigma_prime;
+			fprintf(stdout, "end iteration\n");
+		}
+
+	//#pragma omp barrier
+	} while(r_change || sigma_change);
+	//#endif
 
 	fprintf(stdout, "Analysis Complete...\n");
 }
@@ -402,7 +393,12 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::WriteStore()
 	// fprintf(stdout, "\nr:\n");
 	// cusp::print(r);
 
-	cusp::coo_matrix<int, VALUE_TYPE, MEM_TYPE> store;
+#if BUILD_TYPE == GPU
+	int num_entries = CountEntries(sigma);
+	sigma.num_entries = num_entries;
+#endif
+
+	cusp::coo_matrix<int, VALUE_TYPE, cusp::host_memory> store;
 	cusp::transpose(sigma, store);
 	// fprintf(stdout, "\nsigma:\n");
 	// cusp::print(store);
@@ -422,7 +418,7 @@ void CPU_Test(std::string filename)
 #if(BUILD_TYPE == CPU)
 	CFA<int, int, cusp::host_memory> Analysis;
 #elif(BUILD_TYPE == GPU)
-	CFA<int, char, cusp::device_memory> Analysis;
+	CFA<int, int, cusp::device_memory> Analysis;
 	Analysis.gpuDeviceInit(0);
 #endif	
 
@@ -435,6 +431,29 @@ void CPU_Test(std::string filename)
 
 	fprintf(stdout, "Run Time: %f seconds\n", endTime - startTime);
 	Analysis.WriteStore();
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat)
+{
+	cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp(mat);
+	const INDEX_TYPE invalid_index = cusp::ell_matrix<int, INDEX_TYPE, cusp::device_memory>::invalid_index;
+
+	int num_entries = 0;
+	int pitch = temp.column_indices.pitch;
+	for(int col=0; col<temp.column_indices.num_cols; ++col)
+	{
+		int offset = pitch*col;
+		for(int row=0; row<temp.num_rows; ++row, ++offset)
+		{
+			if(temp.column_indices.values[offset] != invalid_index)
+				num_entries++;
+		}
+	}
+	temp.num_entries = num_entries;
+	//cusp::print(temp);
+
+	return num_entries;
 }
 
 void GPU_Test()

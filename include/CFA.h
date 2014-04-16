@@ -29,7 +29,7 @@
 #include <cusp/dia_matrix.h>
 #include <cusp/ell_matrix.h>
 #include <cusp/csr_matrix.h>
-//#include <cusp/hybb_matrix.h>
+#include <cusp/hyb_matrix.h>
 #include <cusp/coo_matrix.h>
 //#include <cusp/coob_matrix.h>
 #include <cusp/io/matrix_market.h>
@@ -43,6 +43,15 @@
 #define ARG_MAX         512
 #define BLOCKS          32
 #define BLOCK_THREADS   384
+#define NUM_STREAMS     8
+
+#define STREAM_CALL     0
+#define STREAM_LIST     1
+#define STREAM_SET      2
+#define STREAM_IF       3
+#define STREAM_BOOL     4
+#define STREAM_NUM      5
+#define STREAM_VOID     6
 
 #define CPU         0
 #define GPU         1
@@ -73,17 +82,17 @@ private:
 
     bool debug;
 
-#if(BUILD_TYPE == CPU)
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma_prime;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondTrue;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondFalse;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Body;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Fun;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Arg[ARG_MAX];
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Var[ARG_MAX];
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp_Mat[8];
-#elif(BUILD_TYPE == GPU)
+#if BUILD_TYPE == CPU
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma_prime;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondTrue;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondFalse;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Body;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Fun;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Arg[ARG_MAX];
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Var[ARG_MAX];
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp_Mat[8];
+#elif BUILD_TYPE == GPU
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> sigma;
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> sigma_prime;
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> CondTrue;
@@ -92,10 +101,10 @@ private:
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Fun;
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Arg[ARG_MAX];
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Var[ARG_MAX];
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp_Mat[8];
+    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp_Mat[4*NUM_STREAMS];
 #endif
 
-#if(BUILD_TYPE == GPU)
+#if BUILD_TYPE == GPU
     cudaStream_t stream_Call;
     cudaStream_t stream_List;
     cudaStream_t stream_Set;
@@ -105,34 +114,53 @@ private:
     cudaStream_t stream_Void;
 #endif
 
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> Call[ARG_MAX];
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> r;
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> r_prime;
+    //const vectors
     cusp::array1d<VALUE_TYPE, MEM_TYPE> IF;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> SET;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimBool;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimVoid;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimNum;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimList[ARG_MAX];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> Call[ARG_MAX];
+
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> r;
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> r_prime;
+#if BUILD_TYPE == GPU
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> s[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> s_indices[NUM_STREAMS];
+    std::vector<INDEX_TYPE> entry_count;
+#else
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> s;
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> s_indices;
+#endif
+    
     cusp::array1d<VALUE_TYPE, MEM_TYPE> a[ARG_MAX];
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> a_var;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> a_set;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> v[ARG_MAX];
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> vf;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> v_set;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> v_cond;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> v_list;
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> s;
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> s_indices;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> temp_indices;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> AND_vec1;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> AND_vec2;
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> Cond_vec;
+#if BUILD_TYPE == GPU
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> a_var[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> vf[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> Fun_vec[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> Body_vec[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> Arg_vec[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> accum_var_vec[NUM_STREAMS];
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> accum_vf_vec[NUM_STREAMS];
+#else
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> a_var;
+    cusp::array1d<VALUE_TYPE, MEM_TYPE> vf;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> Fun_vec;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> Body_vec;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> Arg_vec;
-    cusp::array1d<VALUE_TYPE, MEM_TYPE> Cond_vec;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> accum_var_vec;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> accum_vf_vec;
+#endif
 
     void f_call();
     void f_list();
@@ -141,6 +169,8 @@ private:
     void f_primBool();
     void f_primNum();
     void f_primVoid();
+
+    int CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat);
 
 #if(BUILD_TYPE == CPU)
     void f_call_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s, const int j);
@@ -151,13 +181,13 @@ private:
     void f_primNum_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s);
     void f_primVoid_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s);
 #elif(BUILD_TYPE == GPU)
-    void f_call_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j);
-    void f_list_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j);
-    void f_set_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s);
-    void f_if_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s);
-    void f_primBool_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s);
-    void f_primNum_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s);
-    void f_primVoid_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s);
+    void f_call_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j, const int stream_ID);
+    void f_list_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j, const int stream_ID);
+    void f_set_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int stream_ID);
+    void f_if_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int stream_ID);
+    void f_primBool_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int stream_ID);
+    void f_primNum_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int stream_ID);
+    void f_primVoid_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int stream_ID);
 #endif
 
     cusp::array1d<VALUE_TYPE, MEM_TYPE> temp_vec;
@@ -208,11 +238,17 @@ template <typename VALUE_TYPE>
 void AccumVec(  cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
                 const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b);
 
-template <typename VALUE_TYPE>
-cusp::csr_matrix<int, VALUE_TYPE, cusp::host_memory>& 
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory>& 
 OuterProduct(   const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
                 const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
-                cusp::csr_matrix<int, VALUE_TYPE, cusp::host_memory> &mat);
+                cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat);
+
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory>& 
+OuterProduct(   const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+                const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
+                cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat);
 #endif      //CPU
 
 #if(BUILD_TYPE == GPU)
@@ -251,7 +287,7 @@ void ell_add(   cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &A
                 cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &C);
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
-void ell_spmv(  const cusp::ell_matrix<int, VALUE_TYPE, cusp::device_memory> &A,
+void ell_spmv(  const cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &A,
                 const cusp::array1d<VALUE_TYPE, cusp::device_memory> &x,
                 cusp::array1d<VALUE_TYPE, cusp::device_memory> &y);
 

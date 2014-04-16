@@ -7,332 +7,321 @@
 
 //F_call
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "call: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices, stream_Call);
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_Call);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_Call);
 	for(int index=0; index < entry_count; ++index)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, index, Fun_vec, stream_Call);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf, stream_Call);
+		column_select(Fun, s_indices[sID], index, Fun_vec[sID], stream_Call);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_Call);
 
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf, stream_Call);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_Call);
 
 		for(int i=0; i<j; ++i)
 		{
-			column_select<INDEX_TYPE, VALUE_TYPE> (Arg[i], s_indices, index, Arg_vec, stream_Call);
-			ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Arg_vec, v[i], stream_Call);
-			ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[i], vf, a[i], stream_Call);
+			column_select(Arg[i], s_indices[sID], index, Arg_vec[sID], stream_Call);
+			ell_spmv(sigma_prime, Arg_vec[sID], v[i], stream_Call);
+			ell_spmv(Var[i], vf[sID], a[i], stream_Call);
 		}
 		
-		temp_Mat[0] = sigma_prime;
+		temp_Mat[sID*4 + 0] = sigma_prime;
 		for(int i=0; i<j; ++i)
 		{
-			OuterProduct<INDEX_TYPE, VALUE_TYPE> (v[i], a[i], temp_Mat[2], stream_Call);
+			OuterProduct(v[i], a[i], temp_Mat[sID*4 + 2], stream_Call);
 			if(i%2 == 0)
-				ell_add<INDEX_TYPE> (temp_Mat[0], temp_Mat[2], temp_Mat[1], stream_Call);
+				ell_add(temp_Mat[sID*4 + 0], temp_Mat[sID*4 + 2], temp_Mat[sID*4 + 1], stream_Call);
 			else
-				ell_add<INDEX_TYPE> (temp_Mat[1], temp_Mat[2], temp_Mat[0], stream_Call);
+				ell_add(temp_Mat[sID*4 + 1], temp_Mat[sID*4 + 2], temp_Mat[sID*4 + 0], stream_Call);
 		}
-		sigma_prime = (j%2 == 1) ? temp_Mat[1] : temp_Mat[0];
+		sigma_prime = (j%2 == 1) ? temp_Mat[sID*4 + 1] : temp_Mat[sID*4 + 0];
 	}
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec, stream_Call);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);		//null stream
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_Call);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_Call);
 }
 
 //f_call
-template <>
-void CFA<int, char, cusp::device_memory>::f_call()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call()
 {
 	fprintf(stdout, "f_call\n");
 	for(int j=1; j<=m_maxCall; ++j)
 	{		
-		AND_OP<char> (r, Call[j], s, stream_Call);
-		f_call_device(s, j);
+		AND_OP<VALUE_TYPE> (r, Call[j], s[STREAM_CALL], stream_Call);
+		f_call_device(s[STREAM_CALL], j, STREAM_CALL);
 	}
 }
 
 //F_list
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int j, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-	thrust::fill(accum_var_vec.begin(), accum_var_vec.end(), 0);
-	thrust::fill(v_list.begin(), v_list.end(), 0);
-
-	//vf = s[i]
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "list: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices, stream_List);
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_List);
+	FILL<VALUE_TYPE> (accum_var_vec[sID], 0, stream_List);
+	FILL<VALUE_TYPE> (v_list, 0, stream_List);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_List);
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, i, Fun_vec, stream_List);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf, stream_List);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[0], vf, a_var, stream_List);
+		column_select(Fun, s_indices[sID], i, Fun_vec[sID], stream_List);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_List);
+		ell_spmv(Var[0], vf[sID], a_var[sID], stream_List);
 
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf, stream_List);
-		AccumVec<VALUE_TYPE> (accum_var_vec, a_var, stream_List);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_List);
+		AccumVec<VALUE_TYPE> (accum_var_vec[sID], a_var[sID], stream_List);
 
 		for(int k=0; k<j; ++k)
 		{
-			column_select<INDEX_TYPE, VALUE_TYPE> (Arg[k], s_indices, i, Arg_vec, stream_List);
-			ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Arg_vec, v[k], stream_List);
+			column_select(Arg[k], s_indices[sID], i, Arg_vec[sID], stream_List);
+			ell_spmv(sigma_prime, Arg_vec[sID], v[k], stream_List);
 			AccumVec<VALUE_TYPE> (v_list, v[k], stream_List);
 		}
 	}
 	AccumVec<VALUE_TYPE> (v_list, LIST_vec, stream_List);
-	OuterProduct<INDEX_TYPE, VALUE_TYPE> (v_list, accum_var_vec, temp_Mat[0], stream_List);
-	ell_add<INDEX_TYPE> (temp_Mat[0], sigma_prime, temp_Mat[1], stream_List);
-	sigma_prime = temp_Mat[1];						//null stream
+	OuterProduct(v_list, accum_var_vec[sID], temp_Mat[sID*4 + 0], stream_List);
+	ell_add(temp_Mat[sID*4 + 0], sigma_prime, temp_Mat[sID*4 + 1], stream_List);
+	sigma_prime = temp_Mat[sID*4 + 1];						//null stream
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec, stream_List);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);		//null stream
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_List);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_List);
 }
 
 //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_list()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list()
 {
 	fprintf(stdout, "f_list\n");
 	for(int j=0; j<=m_maxList; ++j)
 	{
-		AND_OP<char> (r, PrimList[j], s);
-		f_list_device(s, j);
+		AND_OP<VALUE_TYPE> (r, PrimList[j], s[STREAM_LIST], stream_List);
+		f_list_device(s[STREAM_LIST], j, STREAM_LIST);
 	}
 }
 
 // //F_set
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-	thrust::fill(accum_var_vec.begin(), accum_var_vec.end(), 0);
-
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "set: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices);
-	temp_Mat[0] = sigma_prime;
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_Set);
+	FILL<VALUE_TYPE> (accum_var_vec[sID], 0, stream_Set);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_Set);
+	temp_Mat[sID*4 + 0] = sigma_prime;
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, i, Fun_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[0], vf, a_var);
-		column_select<INDEX_TYPE, VALUE_TYPE> (Arg[0], s_indices, i, a_set);
-		column_select<INDEX_TYPE, VALUE_TYPE> (Arg[1], s_indices, i, Arg_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Arg_vec, v_set);
+		column_select(Fun, s_indices[sID], i, Fun_vec[sID], stream_Set);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_Set);
+		ell_spmv(Var[0], vf[sID], a_var[sID], stream_Set);
+		column_select(Arg[0], s_indices[sID], i, a_set, stream_Set);
+		column_select(Arg[1], s_indices[sID], i, Arg_vec[sID], stream_Set);
+		ell_spmv(sigma_prime, Arg_vec[sID], v_set, stream_Set);
 
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf);
-		AccumVec<VALUE_TYPE> (accum_var_vec, a_var);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_Set);
+		AccumVec<VALUE_TYPE> (accum_var_vec[sID], a_var[sID], stream_Set);
 		
-		OuterProduct<INDEX_TYPE, VALUE_TYPE> (v_set, a_set, temp_Mat[1]);
-		ell_add<INDEX_TYPE> (temp_Mat[0], temp_Mat[1], temp_Mat[2]);
-		temp_Mat[0] = temp_Mat[2];
+		OuterProduct(v_set, a_set, temp_Mat[sID*4 + 1], stream_Set);
+		ell_add(temp_Mat[sID*4 + 0], temp_Mat[sID*4 + 1], temp_Mat[sID*4 + 2], stream_Set);
+		temp_Mat[sID*4 + 0] = temp_Mat[sID*4 + 2];
 	}
 
 	//sigma + (a_var (X) void) + (a_set (X) v_set)
-	OuterProduct<INDEX_TYPE, VALUE_TYPE> (VOID_vec, accum_var_vec, temp_Mat[1]);
-	ell_add<INDEX_TYPE> (temp_Mat[0], temp_Mat[1], temp_Mat[2]);
-	sigma_prime = temp_Mat[2];
+	OuterProduct(VOID_vec, accum_var_vec[sID], temp_Mat[sID*4 + 1], stream_Set);
+	ell_add(temp_Mat[sID*4 + 0], temp_Mat[sID*4 + 1], temp_Mat[sID*4 + 2], stream_Set);
+	sigma_prime = temp_Mat[sID*4 + 2];
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_Set);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_Set);
 }
 
 //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_set()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set()
 {
 	fprintf(stdout, "f_set\n");
-	AND_OP<char> (r, SET, s);
+	AND_OP<VALUE_TYPE> (r, SET, s[STREAM_SET], stream_Set);
 		
-	f_set_device(s);
+	f_set_device(s[STREAM_SET], STREAM_SET);
 }
 
 //F_if
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_if_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_if_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int sID)
 {
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "if: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices);
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_IF);
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Arg[0], s_indices, i, Arg_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Arg_vec, v_cond);
+		column_select(Arg[0], s_indices[sID], i, Arg_vec[sID], stream_IF);
+		ell_spmv(sigma_prime, Arg_vec[sID], v_cond, stream_IF);
 	
-		InnerProductStore<VALUE_TYPE> (NOT_FALSE_vec, v_cond, AND_vec1, i);
-		InnerProductStore<VALUE_TYPE> (FALSE_vec, v_cond, AND_vec2, i);
-	}
+		InnerProductStore<VALUE_TYPE> (NOT_FALSE_vec, v_cond, AND_vec1, i, stream_IF);
+		InnerProductStore<VALUE_TYPE> (FALSE_vec, v_cond, AND_vec2, i, stream_IF);
 
-	//TRUE
-	AND_OP<VALUE_TYPE> (s, AND_vec1, temp_indices);
-	entry_count = thrust::count(temp_indices.begin(), temp_indices.end(), 1);
-	get_indices<VALUE_TYPE> (temp_indices, s_indices);
-	for(int i=0; i < entry_count; ++i)
-	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (CondTrue, s_indices, i, Cond_vec);
-		AccumVec<VALUE_TYPE> (r_prime, Cond_vec);
+		column_select_if<INDEX_TYPE, VALUE_TYPE> (CondTrue, s_indices[sID], AND_vec1, i, Cond_vec, stream_IF);
+		AccumVec<VALUE_TYPE> (r_prime, Cond_vec, stream_IF);
+		column_select_if<INDEX_TYPE, VALUE_TYPE> (CondFalse, s_indices[sID], AND_vec2, i, Cond_vec, stream_IF);
+		AccumVec<VALUE_TYPE> (r_prime, Cond_vec, stream_IF);
 	}
-	/////////////////////////////////////////////////////////////////////////////////
-
-	//FALSE
-	AND_OP<VALUE_TYPE> (s, AND_vec2, temp_indices);
-	entry_count = thrust::count(temp_indices.begin(), temp_indices.end(), 1);
-	get_indices<VALUE_TYPE> (temp_indices, s_indices);
-	for(int i=0; i < entry_count; ++i)
-	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (CondFalse, s_indices, i, Cond_vec);
-		AccumVec<VALUE_TYPE> (r_prime, Cond_vec);
-	}
-	/////////////////////////////////////////////////////////////////////////////////
 }
 
 //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_if()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_if()
 {
 	fprintf(stdout, "f_if\n");
-	AND_OP<char> (r, IF, s);
+	AND_OP<VALUE_TYPE> (r, IF, s[STREAM_IF], stream_IF);
 		
-	f_if_device(s);
+	f_if_device(s[STREAM_IF], STREAM_IF);
 }
 
 //F_primNum
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primNum_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primNum_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-	thrust::fill(accum_var_vec.begin(), accum_var_vec.end(), 0);
-
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "num: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices);
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_Num);
+	FILL<VALUE_TYPE> (accum_var_vec[sID], 0, stream_Num);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_Num);
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, i, Fun_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[0], vf, a_var);
-		AccumVec<VALUE_TYPE> (accum_var_vec, a_var);
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf);
+		column_select(Fun, s_indices[sID], i, Fun_vec[sID], stream_Num);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_Num);
+		ell_spmv(Var[0], vf[sID], a_var[sID], stream_Num);
+		AccumVec<VALUE_TYPE> (accum_var_vec[sID], a_var[sID], stream_Num);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_Num);
 	}
 
 	//sigma + (a_var (X) NUM)
-	OuterProduct<INDEX_TYPE, VALUE_TYPE> (NUM_vec, accum_var_vec, temp_Mat[0]);
-	ell_add<INDEX_TYPE> (temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	OuterProduct(NUM_vec, accum_var_vec[sID], temp_Mat[sID*4 + 0], stream_Num);
+	ell_add(temp_Mat[sID*4 + 0], sigma_prime, temp_Mat[sID*4 + 1], stream_Num);
+	sigma_prime = temp_Mat[sID*4 + 1];
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_Num);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_Num);
 }
 
 //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_primNum()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primNum()
 {
 	fprintf(stdout, "f_primBool\n");
-	AND_OP<char> (r, PrimNum, s);
+	AND_OP<VALUE_TYPE> (r, PrimNum, s[STREAM_NUM], stream_Num);
 		
-	f_primNum_device(s);
+	f_primNum_device(s[STREAM_NUM], STREAM_NUM);
 }
 
 //F_primBool
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primBool_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primBool_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-	thrust::fill(accum_var_vec.begin(), accum_var_vec.end(), 0);
-
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "bool: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices);
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_Bool);
+	FILL<VALUE_TYPE> (accum_var_vec[sID], 0, stream_Bool);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_Bool);
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, i, Fun_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[0], vf, a_var);
-		AccumVec<VALUE_TYPE> (accum_var_vec, a_var);
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf);
+		column_select(Fun, s_indices[sID], i, Fun_vec[sID], stream_Bool);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_Bool);
+		ell_spmv(Var[0], vf[sID], a_var[sID], stream_Bool);
+		AccumVec<VALUE_TYPE> (accum_var_vec[sID], a_var[sID], stream_Bool);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_Bool);
 	}
 
 	//sigma + (a_var (X) #T#F)
-	OuterProduct<INDEX_TYPE, VALUE_TYPE> (BOOL_vec, accum_var_vec, temp_Mat[0]);
-	ell_add<INDEX_TYPE> (temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	OuterProduct(BOOL_vec, accum_var_vec[sID], temp_Mat[sID*4 + 0], stream_Bool);
+	ell_add(temp_Mat[sID*4 + 0], sigma_prime, temp_Mat[sID*4 + 1], stream_Bool);
+	sigma_prime = temp_Mat[sID*4 + 1];
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_Bool);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_Bool);
 }
 
 //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_primBool()
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primBool()
 {
 	fprintf(stdout, "f_primBool\n");
-	AND_OP<char> (r, PrimBool, s);
+	AND_OP<VALUE_TYPE> (r, PrimBool, s[STREAM_BOOL], stream_Bool);
 		
-	f_primBool_device(s);
+	f_primBool_device(s[STREAM_BOOL], STREAM_BOOL);
 }
 
 //F_primVoid
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s)
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid_device(const cusp::array1d<VALUE_TYPE, cusp::device_memory> &s, const int sID)
 {
-	thrust::fill(accum_vf_vec.begin(), accum_vf_vec.end(), 0);
-	thrust::fill(accum_var_vec.begin(), accum_var_vec.end(), 0);
-
 	int entry_count = thrust::count(s.begin(), s.end(), 1);
+	fprintf(stderr, "void: %d\n", entry_count);
 	if(entry_count == 0)
 		return;
 
-	get_indices<VALUE_TYPE> (s, s_indices);
+	FILL<VALUE_TYPE> (accum_vf_vec[sID], 0, stream_Void);
+	FILL<VALUE_TYPE> (accum_var_vec[sID], 0, stream_Void);
+
+	get_indices<VALUE_TYPE> (s, s_indices[sID], stream_Void);
 	for(int i=0; i < entry_count; ++i)
 	{
-		column_select<INDEX_TYPE, VALUE_TYPE> (Fun, s_indices, i, Fun_vec);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (sigma_prime, Fun_vec, vf);
-		ell_spmv<INDEX_TYPE, VALUE_TYPE> (Var[0], vf, a_var);
-		AccumVec<VALUE_TYPE> (accum_var_vec, a_var);
-		AccumVec<VALUE_TYPE> (accum_vf_vec, vf);
+		column_select(Fun, s_indices[sID], i, Fun_vec[sID], stream_Void);
+		ell_spmv(sigma_prime, Fun_vec[sID], vf[sID], stream_Void);
+		ell_spmv(Var[0], vf[sID], a_var[sID], stream_Void);
+		AccumVec<VALUE_TYPE> (accum_var_vec[sID], a_var[sID], stream_Void);
+		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream_Void);
 	}
 
 	//sigma + (a_var (X) VOID)
-	OuterProduct<INDEX_TYPE, VALUE_TYPE> (VOID_vec, accum_var_vec, temp_Mat[0]);
-	ell_add<INDEX_TYPE> (temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	OuterProduct(VOID_vec, accum_var_vec[sID], temp_Mat[sID*4 + 0], stream_Void);
+	ell_add(temp_Mat[sID*4 + 0], sigma_prime, temp_Mat[sID*4 + 1], stream_Void);
+	sigma_prime = temp_Mat[sID*4 + 1];
 
 	//r_prime
-	ell_spmv<INDEX_TYPE, VALUE_TYPE> (Body, accum_vf_vec, Body_vec);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec);
+	ell_spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream_Void);
+	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream_Void);
 }
 
-// //entry point
-template <>
-void CFA<int, char, cusp::device_memory>::f_primVoid()
+//entry point
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid()
 {
 	fprintf(stdout, "f_PrimVoid\n");
-	AND_OP<char> (r, PrimVoid, s);
+	AND_OP<VALUE_TYPE> (r, PrimVoid, s[STREAM_VOID], stream_Void);
 		
-	f_primVoid_device(s);
+	f_primVoid_device(s[STREAM_VOID], STREAM_VOID);
 }
 
 #endif

@@ -1,10 +1,10 @@
 #if(BUILD_TYPE == CPU)
 
 //*******************************************************************************//
-template <typename INDEX_TYPE>
-void AND_OP(	const cusp::array1d<INDEX_TYPE, cusp::host_memory> &A, 
-				const cusp::array1d<INDEX_TYPE, cusp::host_memory> &B, 
-				std::vector<INDEX_TYPE> &vec)
+template <typename VALUE_TYPE>
+void AND_OP(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &A, 
+				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &B, 
+				std::vector<VALUE_TYPE> &vec)
 {
 	assert(A.size() == B.size());
 	vec.clear();
@@ -14,9 +14,9 @@ void AND_OP(	const cusp::array1d<INDEX_TYPE, cusp::host_memory> &A,
 			vec.push_back(i);
 }
 
-template <typename INDEX_TYPE>
-void AccumVec(	cusp::array1d<INDEX_TYPE, cusp::host_memory> &a,
-				const cusp::array1d<INDEX_TYPE, cusp::host_memory> &b)
+template <typename VALUE_TYPE>
+void AccumVec(	cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b)
 {
 	assert(a.size() == b.size());
 	//a += b
@@ -24,11 +24,11 @@ void AccumVec(	cusp::array1d<INDEX_TYPE, cusp::host_memory> &a,
 		a[i] += b[i];
 }
 
-template <typename INDEX_TYPE>
-cusp::csr_matrix<int, INDEX_TYPE, cusp::host_memory>& 
-OuterProduct(	const cusp::array1d<INDEX_TYPE, cusp::host_memory> &a,
-				const cusp::array1d<INDEX_TYPE, cusp::host_memory> &b,
-				cusp::csr_matrix<int, INDEX_TYPE, cusp::host_memory> &mat)
+template <typename VALUE_TYPE>
+cusp::csr_matrix<int, VALUE_TYPE, cusp::host_memory>& 
+OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
+				cusp::csr_matrix<int, VALUE_TYPE, cusp::host_memory> &mat)
 {
 	int num_entries_a=0, num_entries_b=0;
 	std::vector<int> a_vec, b_vec;
@@ -71,12 +71,65 @@ OuterProduct(	const cusp::array1d<INDEX_TYPE, cusp::host_memory> &a,
 	return mat;
 }
 
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+cusp::ell_matrix<int, VALUE_TYPE, cusp::host_memory>& 
+OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
+				cusp::ell_matrix<int, VALUE_TYPE, cusp::host_memory> &mat)
+{
+	int num_entries_a=0, num_entries_b=0;
+	std::vector<int> a_vec, b_vec;
+	for(int i=0; i<a.size(); ++i)
+	{
+		if(a[i])
+		{	
+			a_vec.push_back(i);
+			num_entries_a++;
+		}
+	}
+	for(int i=0; i<b.size(); ++i)
+	{
+		if(b[i])
+		{
+			b_vec.push_back(i);
+			num_entries_b++;
+		}
+	}
+
+	const INDEX_TYPE invalid_index = cusp::ell_matrix<int, VALUE_TYPE, cusp::host_memory>::invalid_index;
+
+	//fprintf(stderr, "num_entries: %d %d\n", num_entries_a, num_entries_b);
+	int num_rows = a.size(), num_cols = b.size();
+	mat.resize(num_rows, num_cols, num_entries_a*num_entries_b, num_cols/10);
+	int offset = 0, num_cols_per_row = mat.column_indices.num_cols, pitch = mat.column_indices.pitch;
+	for(int row=0; row < num_rows; ++row)
+	{
+		offset = row;
+		if(a[i])
+		{
+			for(int n=0; n < num_cols_per_row; ++n, offset+=pitch)
+			{
+				if(n < b_vec.size())
+				{
+					mat.column_indices[offset] = b_vec[n];
+					mat.values[offset] = 1;
+				}
+				else
+					mat.column_indices[offset] = invalid_index;
+			}
+		}
+	}
+
+	//fprintf(stderr, "(%dx%d)\n", mat.num_rows, mat.num_cols);
+	return mat;
+}
+
 //*******************************************************************************//
 //Host Forms
 
 //F_call
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s, const int j)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s, const int j)
 {
 	//vf = s[i]
 	temp_vec.resize(Fun.num_rows);
@@ -110,7 +163,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<INDEX_TYPE, cusp
 
 //f_call
 template <>
-void CFA<int, cusp::host_memory>::f_call()
+void CFA<int, int, cusp::host_memory>::f_call()
 {
 	std::vector<int> search_vec;
 	for(int j=1; j<=m_maxCall; ++j)
@@ -128,8 +181,8 @@ void CFA<int, cusp::host_memory>::f_call()
 }
 
 //f_list
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s, const int j)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s, const int j)
 {
 	//vf = s[i]
 	temp_vec.resize(Fun.num_rows);
@@ -160,7 +213,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<INDEX_TYPE, cusp
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_list()
+void CFA<int, int, cusp::host_memory>::f_list()
 {
 	std::vector<int> search_vec;
 	for(int j=0; j<=m_maxList; ++j)
@@ -179,8 +232,8 @@ void CFA<int, cusp::host_memory>::f_list()
 
 
 //F_set
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_set_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s)
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
@@ -204,7 +257,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_set_host(const cusp::array1d<INDEX_TYPE, cusp:
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_set()
+void CFA<int, int, cusp::host_memory>::f_set()
 {
 	std::vector<int> search_vec;
 	AND_OP(r, SET, search_vec);
@@ -218,8 +271,8 @@ void CFA<int, cusp::host_memory>::f_set()
 }
 
 //f_if
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_if_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_if_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s)
 {
 	temp_vec.resize(Arg[0].num_rows);
 	cusp::multiply(Arg[0], s, temp_vec);
@@ -251,7 +304,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_if_host(const cusp::array1d<INDEX_TYPE, cusp::
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_if()
+void CFA<int, int, cusp::host_memory>::f_if()
 {
 	std::vector<int> search_vec;
 	AND_OP(r, IF, search_vec);
@@ -265,8 +318,8 @@ void CFA<int, cusp::host_memory>::f_if()
 }
 
 //f_primNum
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_primNum_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primNum_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s)
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
@@ -286,7 +339,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_primNum_host(const cusp::array1d<INDEX_TYPE, c
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_primNum()
+void CFA<int, int, cusp::host_memory>::f_primNum()
 {
 	std::vector<int> search_vec;
 	AND_OP(r, PrimNum, search_vec);
@@ -300,8 +353,8 @@ void CFA<int, cusp::host_memory>::f_primNum()
 }
 
 //f_primBool
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_primBool_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primBool_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s)
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
@@ -321,7 +374,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_primBool_host(const cusp::array1d<INDEX_TYPE, 
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_primBool()
+void CFA<int, int, cusp::host_memory>::f_primBool()
 {
 	std::vector<int> search_vec;
 	AND_OP(r, PrimBool, search_vec);
@@ -335,8 +388,8 @@ void CFA<int, cusp::host_memory>::f_primBool()
 }
 
 //f_primVoid
-template <typename INDEX_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, MEM_TYPE>::f_primVoid_host(const cusp::array1d<INDEX_TYPE, cusp::host_memory> &s)
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s)
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
@@ -356,7 +409,7 @@ void CFA<INDEX_TYPE, MEM_TYPE>::f_primVoid_host(const cusp::array1d<INDEX_TYPE, 
 
 //entry point
 template <>
-void CFA<int, cusp::host_memory>::f_primVoid()
+void CFA<int, int, cusp::host_memory>::f_primVoid()
 {
 	std::vector<int> search_vec;
 	AND_OP(r, PrimVoid, search_vec);

@@ -257,12 +257,12 @@
                                    clos)]
                              [`(if ,ae ,et ,ef)
                               (define aev (atomic ae sigma)) 
-                              (foldl (lambda (v el acc) 
-                                             (if (set-member? aev v) 
-                                                 (cons `(,el ,sigma) acc) 
+                              (foldl (lambda (pred el acc) 
+                                             (if (pred aev)
+                                                 (cons `(,el ,sigma) acc)
                                                  acc)) 
                                      '() 
-                                     '(TRUE FALSE) 
+                                     (list (lambda (aev) (> (set-count (set-subtract aev (set 'FALSE))) 0)) (lambda (aev) (set-member? aev 'FALSE)))
                                      `(,et ,ef))]
                              [`(,aef ,aes ...)
                               (define fv (atomic aef sigma)) 
@@ -318,7 +318,7 @@
       (define x (list-ref X row))
       (define value (list-ref V col))
       
-      (set! msigma (store-join msigma (hash x (set (if (and (number? value) (let ([e (hash-ref saved value)]) (and (list? e) (equal? (first e) 'lambda)))) (hash-ref saved value) value))))))
+      (set! msigma (store-join msigma (hash x (set (if (and (number? value) (let ([e (hash-ref saved value)]) (and (list? e) (member (first e) '(lambda))))) (hash-ref saved value) value))))))
     
     (matrix-store in)))
 

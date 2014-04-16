@@ -184,7 +184,7 @@
 ;(pretty-print CLO)
 ;(pretty-print X)
 ;(pretty-print T)
-;(pretty-print (hash-ref saved (list-ref S 28)))
+(pretty-print (hash-ref saved 8706))
 ;(pretty-print root)
 
 

@@ -7,6 +7,7 @@
 #include <thrust/reduce.h>
 #include <thrust/scan.h>
 #include <thrust/inner_product.h>
+//#include <thrust/pinned_allocator.h>
 
 //cusp and thrust
 typedef cusp::array1d<char, cusp::device_memory> 	CuspVectorChar_d;

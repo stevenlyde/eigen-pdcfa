@@ -26,10 +26,9 @@ void AccumVec(	cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
-cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory>& 
-OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
-				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
-				cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat)
+void OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+					const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
+					cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat)
 {
 	INDEX_TYPE num_entries_a=0, num_entries_b=0;
 	std::vector<INDEX_TYPE> a_vec, b_vec;
@@ -67,20 +66,16 @@ OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 		}
 	}
 	mat.row_offsets[a.size()] = row_offset;
-
-	//fprintf(stderr, "(%dx%d)\n", mat.num_rows, mat.num_cols);
-	return mat;
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE>
-cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory>& 
-OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
-				const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
-				cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat)
+void OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
+					const cusp::array1d<VALUE_TYPE, cusp::host_memory> &b,
+					cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> &mat)
 {
-	int num_entries_a=0, num_entries_b=0;
-	std::vector<int> a_vec, b_vec;
-	for(int i=0; i<a.size(); ++i)
+	INDEX_TYPE num_entries_a=0, num_entries_b=0;
+	std::vector<INDEX_TYPE> a_vec, b_vec;
+	for(INDEX_TYPE i=0; i<a.size(); ++i)
 	{
 		if(a[i])
 		{	
@@ -88,7 +83,7 @@ OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 			num_entries_a++;
 		}
 	}
-	for(int i=0; i<b.size(); ++i)
+	for(INDEX_TYPE i=0; i<b.size(); ++i)
 	{
 		if(b[i])
 		{
@@ -99,9 +94,9 @@ OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 
 	const INDEX_TYPE invalid_index = cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory>::invalid_index;
 
-	//fprintf(stderr, "num_entries: %d %d\n", num_entries_a, num_entries_b);
+	fprintf(stderr, "num_entries: %d %d\n", num_entries_a, num_entries_b);
 	int num_rows = a.size(), num_cols = b.size();
-	mat.resize(num_rows, num_cols, num_entries_a*num_entries_b, max(num_cols/10, num_entries_b));
+	mat.resize(num_rows, num_cols, num_entries_a*num_entries_b, num_entries_b);
 	int num_cols_per_row = mat.column_indices.num_cols, pitch = mat.column_indices.pitch;
 	for(int row=0; row < num_rows; ++row)
 	{
@@ -122,8 +117,7 @@ OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 	}
 
 	assert(mat.num_entries == num_entries_a*num_entries_b);
-	//fprintf(stderr, "(%dx%d)\n", mat.num_rows, mat.num_cols);
-	return mat;
+	//print_matrix_info(mat);
 }
 
 //*******************************************************************************//
@@ -133,7 +127,6 @@ OuterProduct(	const cusp::array1d<VALUE_TYPE, cusp::host_memory> &a,
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
 void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s, const int j)
 {
-	//vf = s[i]
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
 	cusp::multiply(sigma_prime, temp_vec, vf);
@@ -202,8 +195,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<VALU
 		AccumVec(v_list, v[i]);
 	}
 	AccumVec(v_list, LIST_vec);
-	if(j == 216)
-		fprintf(stderr, "v_list: %d\n", v_list.size());
 	OuterProduct(v_list, a_var, temp_Mat[0]);
 	cusp::add(temp_Mat[0], sigma_prime, temp_Mat[1]);
 	sigma_prime = temp_Mat[1];
@@ -249,7 +240,9 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set_host(const cusp::array1d<VALUE
 	cusp::multiply(sigma_prime, temp_vec, v_set);
 
 	//sigma + (a_var (X) void) + (a_set (X) v_set)
-	cusp::add(OuterProduct(VOID_vec, a_var, temp_Mat[0]), OuterProduct(v_set, a_set, temp_Mat[1]), temp_Mat[2]);
+	OuterProduct(VOID_vec, a_var, temp_Mat[0]);
+	OuterProduct(v_set, a_set, temp_Mat[1]);
+	cusp::add(temp_Mat[0], temp_Mat[1], temp_Mat[2]);
 	cusp::add(temp_Mat[2], sigma_prime, temp_Mat[3]);
 	sigma_prime = temp_Mat[3];
 

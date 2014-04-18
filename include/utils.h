@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <string>
 
-void CPU_Test(std::string filename);
-void GPU_Test();
+void Test(std::string filename);
 
 #endif

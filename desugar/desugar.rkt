@@ -11,11 +11,11 @@
   (member op
    '(+ - / * expt modulo quotient > < >= <= = equal? eq?
      if print string-append string-length substring
-     void sqrt pretty-print max min
+     void sqrt pretty-print max min list? gensym
      list cons null? car cdr append length assq list?
      not number? reverse memq member vector->list
      make-vector vector-length vector-ref vector-set!
-     exact->inexact fl+ fl- fl/ fl* fl> flsin)))
+     exact->inexact fl+ fl- fl/ fl* fl> flsin boolean?)))
 
 
 ; input language
@@ -316,7 +316,7 @@
 ; Read from stdin, translate, and print to stdout
 ;(display (simplify (collapse-defines (read))))
 (pretty-write
-  (alpha-rename
+  ;(alpha-rename
     (cps-convert
       (anf-convert
         (simplify
@@ -326,7 +326,7 @@
         )
       )
     )
-  )
+  ;)
 )
 (newline)
 

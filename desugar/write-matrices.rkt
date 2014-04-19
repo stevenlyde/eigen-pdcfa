@@ -184,7 +184,7 @@
 ;(pretty-print CLO)
 ;(pretty-print X)
 ;(pretty-print T)
-(pretty-print (hash-ref saved 8706))
+;(pretty-print (hash-ref saved 8706))
 ;(pretty-print root)
 
 
@@ -553,7 +553,8 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal? null? not and or fl> fl<)))
+              (when (and (list? e) (equal? (first e) 'prim) 
+                         (member (second e) '(< > <= >= = equal? null? not and or fl> fl< list? number? boolean?)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))

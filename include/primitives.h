@@ -91,6 +91,26 @@ void get_indices(	const cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
 			int(a.size()));
 }
 
+template <typename INDEX_TYPE, typename VALUE_TYPE>
+void count(	const cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
+			const VALUE_TYPE val,
+			INDEX_TYPE *h_res,
+			INDEX_TYPE *d_res,
+			cudaStream_t &stream)
+{
+	const size_t NUM_BLOCKS = 1;
+	const size_t BLOCK_SIZE = 512;
+
+	fprintf(stderr, "count: a.size: %d\n", a.size());
+	count<INDEX_TYPE, VALUE_TYPE, 512> <<<NUM_BLOCKS, BLOCK_SIZE, 0, stream>>> (
+			TPC(&a[0]),
+			val,
+			d_res,
+			int(a.size()));
+
+	cudaMemcpyAsync(h_res, d_res, sizeof(INDEX_TYPE), cudaMemcpyDeviceToHost, stream);
+}
+
 template <typename VALUE_TYPE>
 void gather_reduce(	const cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
 					cusp::array1d<VALUE_TYPE, cusp::device_memory> &b,
@@ -735,7 +755,7 @@ void LoadEllMatrix_device(	cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device
 							cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst)
 {
 	//src.sort_by_row_and_column();
-	dst.resize(src.num_rows, src.num_cols, src.num_entries, std::max(src.num_cols/20, ulong(8)));
+	dst.resize(src.num_rows, src.num_cols, src.num_entries, std::max(src.num_cols/16, ulong(48)));
 
 	mat_info<INDEX_TYPE> infoDst;
 	get_ell_matrix_info<VALUE_TYPE> (dst, infoDst);

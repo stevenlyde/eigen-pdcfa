@@ -105,6 +105,34 @@ gather_reduce(	const VALUE_TYPE *a,
 		index_count[0] = count[0];
 }
 
+template <typename INDEX_TYPE, typename VALUE_TYPE, int BLOCK_SIZE>
+__launch_bounds__(BLOCK_SIZE,1)
+__global__ void 
+count(	const VALUE_TYPE *a,
+		const VALUE_TYPE val,
+		INDEX_TYPE *res,
+		const int size)
+{
+	const int tID = blockDim.x * blockIdx.x + threadIdx.x;
+	const int grid_size = blockDim.x * gridDim.x;
+
+	__shared__ INDEX_TYPE count[BLOCK_SIZE];
+	count[tID] = 0;
+	__syncthreads();
+
+	for(int i=tID; i < size; i+=grid_size)
+	{
+		if(a[i] == val)
+			count[i]++;
+	}
+	__syncthreads();
+
+	reduce_sum<VALUE_TYPE, BLOCK_SIZE>(count, tID);
+
+	if(tID == 0)
+		res[0] = count[0];
+}
+
 template <typename VALUE_TYPE>
 __launch_bounds__(BLOCK_THREADS,1)
 __global__ void 

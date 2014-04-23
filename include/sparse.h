@@ -7,7 +7,7 @@
 #include <thrust/reduce.h>
 #include <thrust/scan.h>
 #include <thrust/inner_product.h>
-//#include <thrust/pinned_allocator.h>
+#include <thrust/system/cuda/experimental/pinned_allocator.h>
 
 //cusp and thrust
 typedef cusp::array1d<char, cusp::device_memory> 	CuspVectorChar_d;
@@ -28,23 +28,23 @@ inline void safeSync()
 		fprintf( stderr, "!! GPU program execution error on line %d : cudaError=%d, (%s)\n", __LINE__, error, cudaGetErrorString(error));
 }
 
-inline void checkCUDAError(const char *msg)
-{
-	cudaError_t err = cudaGetLastError();
-	if( cudaSuccess != err) 
-	{
-		fprintf(stderr, "Cuda error: %s: %s\n", msg, cudaGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-}
+// inline void checkCUDAError(const char *msg)
+// {
+// 	cudaError_t err = cudaGetLastError();
+// 	if( cudaSuccess != err) 
+// 	{
+// 		fprintf(stderr, "Cuda error: %s: %s\n", msg, cudaGetErrorString(err));
+// 		exit(EXIT_FAILURE);
+// 	}
+// }
 
-inline void checkCUDAError(const cudaError_t err, const char *msg)
-{
-	if( cudaSuccess != err) 
-	{
-		fprintf(stderr, "Cuda error: %s: %s\n", msg, cudaGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-}
+// inline void checkCUDAError(const cudaError_t err, const char *msg)
+// {
+// 	if( cudaSuccess != err) 
+// 	{
+// 		fprintf(stderr, "Cuda error: %s: %s\n", msg, cudaGetErrorString(err));
+// 		exit(EXIT_FAILURE);
+// 	}
+// }
 
 #endif

@@ -129,17 +129,17 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<VALU
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 
 	temp_vec.resize(Arg[0].num_rows);
 	for(int i=0; i<j; ++i)
 	{
 		cusp::multiply(Arg[i], s, temp_vec);
-		cusp::multiply(sigma_prime, temp_vec, v[i]);
+		cusp::multiply(sigma, temp_vec, v[i]);
 		cusp::multiply(Var[i], vf, a[i]);
 	}
 
-	temp_Mat[0] = sigma_prime;
+	temp_Mat[0] = sigma;
 	for(int i=0; i<j; ++i)
 	{
 		OuterProduct(v[i], a[i], temp_Mat[2]);
@@ -148,7 +148,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<VALU
 		else
 			cusp::add(temp_Mat[1], temp_Mat[2], temp_Mat[0]);
 	}
-	sigma_prime = (j%2 == 1) ? temp_Mat[1] : temp_Mat[0];
+	sigma = (j%2 == 1) ? temp_Mat[1] : temp_Mat[0];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -161,17 +161,20 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_call()
 {
 	std::vector<int> search_vec;
-	fprintf(stdout, "f_call\n");
+	//fprintf(stdout, "f_call\n");
 	for(int j=1; j<=m_maxCall; ++j)
 	{
-		AND_OP(r, Call[j], search_vec);
-		//fprintf(stdout, "f_call_%d: %d\n", j, search_vec.size());
-
-		for(int i=0; i<search_vec.size(); ++i)
+		if(valid_Call[j])
 		{
-			thrust::fill(s.begin(), s.end(), 0);
-			s[search_vec[i]] = 1;
-			f_call_host(s, j);
+			AND_OP(r_prime, Call[j], search_vec);
+			fprintf(stdout, "f_call_%d: %d\n", j, search_vec.size());
+
+			for(int i=0; i<search_vec.size(); ++i)
+			{
+				thrust::fill(s.begin(), s.end(), 0);
+				s[search_vec[i]] = 1;
+				f_call_host(s, j);
+			}
 		}
 	}
 }
@@ -183,7 +186,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<VALU
 	//vf = s[i]
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 	cusp::multiply(Var[0], vf, a_var);
 
 	temp_vec.resize(Arg[0].num_rows);
@@ -191,13 +194,13 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_list_host(const cusp::array1d<VALU
 	for(int i=0; i<j; ++i)
 	{
 		cusp::multiply(Arg[i], s, temp_vec);
-		cusp::multiply(sigma_prime, temp_vec, v[i]);
+		cusp::multiply(sigma, temp_vec, v[i]);
 		AccumVec(v_list, v[i]);
 	}
 	AccumVec(v_list, LIST_vec);
 	OuterProduct(v_list, a_var, temp_Mat[0]);
-	cusp::add(temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	cusp::add(temp_Mat[0], sigma, temp_Mat[1]);
+	sigma = temp_Mat[1];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -210,17 +213,20 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_list()
 {
 	std::vector<int> search_vec;
-	fprintf(stdout, "f_list\n");
+	//fprintf(stdout, "f_list\n");
 	for(int j=0; j<=m_maxList; ++j)
 	{
-		AND_OP(r, PrimList[j], search_vec);
-		//fprintf(stdout, "f_list_%d: %d\n", j, search_vec.size());
-
-		for(int i=0; i<search_vec.size(); ++i)
+		if(valid_List[j])
 		{
-			thrust::fill(s.begin(), s.end(), 0);
-			s[search_vec[i]] = 1;
-			f_list_host(s, j);
+			AND_OP(r_prime, PrimList[j], search_vec);
+			fprintf(stdout, "f_list_%d: %d\n", j, search_vec.size());
+
+			for(int i=0; i<search_vec.size(); ++i)
+			{
+				thrust::fill(s.begin(), s.end(), 0);
+				s[search_vec[i]] = 1;
+				f_list_host(s, j);
+			}
 		}
 	}
 }
@@ -232,19 +238,19 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_set_host(const cusp::array1d<VALUE
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 	cusp::multiply(Var[0], vf, a_var);
 	cusp::multiply(Arg[0], s, a_set);
 	temp_vec.resize(Arg[1].num_rows);
 	cusp::multiply(Arg[1], s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, v_set);
+	cusp::multiply(sigma, temp_vec, v_set);
 
 	//sigma + (a_var (X) void) + (a_set (X) v_set)
 	OuterProduct(VOID_vec, a_var, temp_Mat[0]);
 	OuterProduct(v_set, a_set, temp_Mat[1]);
 	cusp::add(temp_Mat[0], temp_Mat[1], temp_Mat[2]);
-	cusp::add(temp_Mat[2], sigma_prime, temp_Mat[3]);
-	sigma_prime = temp_Mat[3];
+	cusp::add(temp_Mat[2], sigma, temp_Mat[3]);
+	sigma = temp_Mat[3];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -257,7 +263,7 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_set()
 {
 	std::vector<int> search_vec;
-	AND_OP(r, SET, search_vec);
+	AND_OP(r_prime, SET, search_vec);
 	fprintf(stdout, "f_set: %d\n", search_vec.size());
 	for(int i=0; i<search_vec.size(); ++i)
 	{
@@ -273,7 +279,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_if_host(const cusp::array1d<VALUE_
 {
 	temp_vec.resize(Arg[0].num_rows);
 	cusp::multiply(Arg[0], s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, v_cond);
+	cusp::multiply(sigma, temp_vec, v_cond);
 
 	int tb = thrust::inner_product(v_cond.begin(), v_cond.end(), NOT_FALSE_vec.begin(), 0);
 	int fb = thrust::inner_product(v_cond.begin(), v_cond.end(), FALSE_vec.begin(), 0);
@@ -303,7 +309,7 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_if()
 {
 	std::vector<int> search_vec;
-	AND_OP(r, IF, search_vec);
+	AND_OP(r_prime, IF, search_vec);
 	fprintf(stdout, "f_if: %d\n", search_vec.size());
 	for(int i=0; i<search_vec.size(); ++i)
 	{
@@ -319,13 +325,13 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primNum_host(const cusp::array1d<V
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 	cusp::multiply(Var[0], vf, a_var);
 
 	//sigma + (a_var (X) NUM)
 	OuterProduct(NUM_vec, a_var, temp_Mat[0]);
-	cusp::add(temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	cusp::add(temp_Mat[0], sigma, temp_Mat[1]);
+	sigma = temp_Mat[1];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -338,7 +344,7 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_primNum()
 {
 	std::vector<int> search_vec;
-	AND_OP(r, PrimNum, search_vec);
+	AND_OP(r_prime, PrimNum, search_vec);
 	fprintf(stdout, "f_primNum: %d\n", search_vec.size());
 	for(int i=0; i<search_vec.size(); ++i)
 	{
@@ -354,13 +360,13 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primBool_host(const cusp::array1d<
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 	cusp::multiply(Var[0], vf, a_var);
 
 	//sigma + (a_var (X) #T#F)
 	OuterProduct(BOOL_vec, a_var, temp_Mat[0]);
-	cusp::add(temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	cusp::add(temp_Mat[0], sigma, temp_Mat[1]);
+	sigma = temp_Mat[1];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -373,7 +379,7 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_primBool()
 {
 	std::vector<int> search_vec;
-	AND_OP(r, PrimBool, search_vec);
+	AND_OP(r_prime, PrimBool, search_vec);
 	fprintf(stdout, "f_primBool: %d\n", search_vec.size());
 	for(int i=0; i<search_vec.size(); ++i)
 	{
@@ -389,13 +395,13 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid_host(const cusp::array1d<
 {
 	temp_vec.resize(Fun.num_rows);
 	cusp::multiply(Fun, s, temp_vec);
-	cusp::multiply(sigma_prime, temp_vec, vf);
+	cusp::multiply(sigma, temp_vec, vf);
 	cusp::multiply(Var[0], vf, a_var);
 
 	//sigma + (a_var (X) VOID)
 	OuterProduct(VOID_vec, a_var, temp_Mat[0]);
-	cusp::add(temp_Mat[0], sigma_prime, temp_Mat[1]);
-	sigma_prime = temp_Mat[1];
+	cusp::add(temp_Mat[0], sigma, temp_Mat[1]);
+	sigma = temp_Mat[1];
 
 	//r_prime
 	temp_vec.resize(Body.num_rows);
@@ -408,7 +414,7 @@ template <>
 void CFA<int, int, cusp::host_memory>::f_primVoid()
 {
 	std::vector<int> search_vec;
-	AND_OP(r, PrimVoid, search_vec);
+	AND_OP(r_prime, PrimVoid, search_vec);
 	fprintf(stdout, "f_PrimVoid: %d\n", search_vec.size());
 	for(int i=0; i<search_vec.size(); ++i)
 	{

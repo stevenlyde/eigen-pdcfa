@@ -183,6 +183,8 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 	{
 		int rows, cols, i, j;
 		char buf[64], name[32];
+		valid_Call.resize(ARG_MAX);
+		valid_List.resize(ARG_MAX);
 
 		tf.getline(buf, 64);
 		if(tf.gcount() > 1)
@@ -241,7 +243,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 				}
 			}
 
-			if(ID == 0)
+			if(ID == 0 && A.num_entries > 0)
 			{
 				fprintf(stderr, "\n%s (%d x %d) with %d entries\n", name, A.num_rows, A.num_cols, A.num_entries);
 				fprintf(stderr, "B: (%d x %d)\n", B.num_rows, B.num_cols);
@@ -266,22 +268,29 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 					size_t index_size = shared_sigma.pitch  * shared_sigma.num_cols_per_row * sizeof(INDEX_TYPE);
 					size_t values_size = shared_sigma.pitch * shared_sigma.num_cols_per_row * sizeof(VALUE_TYPE);
 
-					checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_column_indices, index_size, cudaHostAllocMapped));
-					checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_values, values_size, cudaHostAllocMapped));
+					// checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_column_indices, index_size, cudaHostAllocMapped));
+					// checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_values, values_size, cudaHostAllocMapped));
+
+					size_t entry_count_size = 32*sizeof(INDEX_TYPE);
+					checkCudaErrors( cudaHostAlloc((void **)&entry_count_host, entry_count_size, 0));
+					checkCudaErrors( cudaMalloc((void **)&entry_count_device, entry_count_size));
+					memset(entry_count_host, 0, entry_count_size);
+					checkCudaErrors( cudaMemcpy(entry_count_device, entry_count_host, entry_count_size, cudaMemcpyHostToDevice) );
 				}
 				#pragma omp barrier
-				checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.column_indices, (void *)shared_sigma.host_column_indices, 0));
-				checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.values, (void *)shared_sigma.host_values, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.column_indices, (void *)shared_sigma.host_column_indices, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.values, (void *)shared_sigma.host_values, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&entry_count_device, (void *)entry_count_host, 0));
 				#pragma omp barrier
 				cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp;
 				temp = B;
-
-				//set sigma for legacy code....   hack (fix later)
-				sigma.resize(shared_sigma.num_rows, shared_sigma.num_cols, 0, 1);
 				LoadEllMatrix(temp, sigma);
-				LoadEllMatrix(temp, shared_sigma);
-				fprintf(stderr, "shared_sigma.num_cols: %d\n", shared_sigma.num_cols);
-				fprintf(stderr, "shared_sigma.num_rows: %d\n", shared_sigma.num_rows);
+				int num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+				fprintf(stderr, "num_entries: %d\n", num_entries);
+
+				// LoadEllMatrix(temp, shared_sigma);
+				// fprintf(stderr, "shared_sigma.num_cols: %d\n", shared_sigma.num_cols);
+				// fprintf(stderr, "shared_sigma.num_rows: %d\n", shared_sigma.num_rows);
 #endif
 				if(ID == 0)
 					print_matrix_info(sigma);
@@ -324,6 +333,11 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 			}
 			else if(sname == "Call")
 			{
+				if(A.num_entries > 0)
+					valid_Call[mat_num] = true;
+				else
+					valid_Call[mat_num] = false;
+
 				Call[mat_num] = vec;
 				if(m_maxCall < mat_num)
 					m_maxCall = mat_num;
@@ -336,6 +350,11 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 				PrimVoid = vec;
 			else if(sname == "PrimList")
 			{
+				if(A.num_entries > 0)
+					valid_List[mat_num] = true;
+				else
+					valid_List[mat_num] = false;
+
 				PrimList[mat_num] = vec;
 				if(m_maxList < mat_num)
 					m_maxList = mat_num;
@@ -357,9 +376,9 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 {
 	int ID = omp_get_thread_num();
 	fprintf(stdout, "\n\n\nStarting analysis: %d\n", ID);
-	
+
+	int prev_num_entries = sigma.num_entries;
 	r_prime = r;
-	sigma_prime = sigma;
 	int iter=0;
 	bool sigma_change = false, r_change = false;
 	fprintf(stderr, "m_maxCall: %d  m_maxList: %d\n", m_maxCall, m_maxList);
@@ -367,8 +386,14 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 	//#pragma omp parallel num_threads(NUM_STREAMS)
 	do
 	{
+		iter++;
 		if(ID == 0)
-			fprintf(stdout, "\n\nITERATION %d\n\n", ++iter);
+			fprintf(stdout, "\n\nITERATION %d\n\n", iter);
+
+		// if(iter == 12)
+		// 	debug = true;
+		// else
+		// 	debug = false;
 
 #if BUILD_TYPE == GPU
 		//if(ID == 1)
@@ -382,7 +407,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 		//if(ID == 5)
 		 	f_primBool();
 		//if(ID == 6)
-		 	f_primNum();
+			f_primNum();
 		//if(ID == 7)
 			f_primVoid();
 #else
@@ -396,57 +421,44 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 #endif
 
 	//#pragma omp barrier
-		if(ID == 0)
+		if(ID == 0 && iter % 5 == 0)
 		{
 			fprintf(stdout, "\nupdate sigma\n");
 		#if BUILD_TYPE == GPU
-			#if MULTI_GPU == 2
-			int count = 0;
-			for(int row=0; row<shared_sigma.num_rows; ++row)
-			{
-				int offset = row;
-				for(int col=0; col < shared_sigma.num_cols_per_row; ++col, offset+=shared_sigma.pitch)
-				{
-					if(shared_sigma.column_indices[offset] != -1)
-						count++;
-				}
-			}
-			shared_sigma.num_entries = count;
-			#else
-			sigma_prime.num_entries = thrust::count_if(sigma_prime.column_indices.values.begin(), sigma_prime.column_indices.values.end(), is_non_negative());
-			//DEBUG_PRINT("sigma_prime", sigma_prime);
-			fprintf(stderr, "num_entries: %d  %d\n", sigma.num_entries, sigma_prime.num_entries);
-			#endif
+			// #if MULTI_GPU == 2
+			// int count = 0;
+			// for(int row=0; row<shared_sigma.num_rows; ++row)
+			// {
+			// 	int offset = row;
+			// 	for(int col=0; col < shared_sigma.num_cols_per_row; ++col, offset+=shared_sigma.pitch)
+			// 	{
+			// 		if(shared_sigma.column_indices[offset] != -1)
+			// 			count++;
+			// 	}
+			// }
+			// shared_sigma.num_entries = count;
+			// #else
+			if(iter % 5 == 0)
+			sigma.num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+			fprintf(stderr, "num_entries: %d  %d\n", prev_num_entries, sigma.num_entries);
+			//DEBUG_PRINT("sigma", sigma);
+
+			//#endif
 		#else
-			//sigma_prime.num_entries = thrust::count_if(sigma_prime.column_indices.values.begin(), sigma_prime.column_indices.values.end(), is_non_negative());
-			//thrust::fill(sigma_prime.values.begin(), sigma_prime.values.end(), 1);
+			//sigma.num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+			//thrust::fill(sigma.values.begin(), sigma.values.end(), 1);
 		#endif
 
-			#if MULTI_GPU == 2
-				if(sigma.num_entries != shared_sigma.num_entries)
-					sigma_change = true;
-				else
-					sigma_change = false;
-				sigma.num_entries = shared_sigma.num_entries;
-			#else
-				if(sigma.num_entries != sigma_prime.num_entries)
-					sigma_change = true;
-				else
-					sigma_change = false;
-				sigma.num_entries = sigma_prime.num_entries;
-			#endif
+			if(prev_num_entries != sigma.num_entries)
+				sigma_change = true;
+			else
+				sigma_change = false;
+			prev_num_entries = sigma.num_entries;
 
 			fprintf(stdout, "\nupdate r\n");
 			int r_entries = thrust::count(r.begin(), r.end(), 1);
 			int r_prime_entries = thrust::count(r_prime.begin(), r_prime.end(), 1);
 
-			//DEBUG_PRINT("r: ", r);
-			// if(debug)
-			// {
-			// 	fprintf(stdout, "***r difference***\n");
-			// 	cusp::print(temp_r);
-			// 	cusp::print(r_prime);
-			// }
 			if(r_entries != r_prime_entries)
 				r_change = true;
 			else
@@ -456,6 +468,11 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 			fprintf(stderr, "sigma.num_entries: %d\n", sigma.num_entries);
 			//sigma = sigma_prime;
 			fprintf(stdout, "end iteration\n");
+		}
+		else
+		{
+			r_change = true;
+			sigma_change = true;
 		}
 
 	//#pragma omp barrier

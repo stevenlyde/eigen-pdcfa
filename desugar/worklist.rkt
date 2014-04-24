@@ -206,7 +206,7 @@
 (define (delta op aevs)
         (match (case op ((+ - * / sqrt expt max min exact->inexact fl+ fl- fl/ fl* flsin length vector-length modulo) 'NUM) 
                         ((void print pretty-print vector-set!) 'VOID) 
-                        ((< > <= >= = null? equal? not fl< fl>) 'BOOL) 
+                        ((< > <= >= = null? equal? not fl< fl> list? number? boolean?) 'BOOL) 
                         ((list append cons cdr car reverse memq member vector-ref make-vector) 'LIST))
                ['NUM (set 'INT)]
                ['VOID (set 'VOID)]

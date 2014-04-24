@@ -14,6 +14,7 @@
 
 (define (process-input e)
         (match e
+               [`(quote ,s) (save! e)]
                [`(prim ,op ,ae* ...)
                 (save! `(prim ,op . ,(map process-input ae*)))]
                [`(halt)
@@ -31,6 +32,7 @@
 (define (pretty-program [l root])
         (define e (hash-ref saved l))
         (match e
+               [`(quote ,s) `(label ,l ,e)]
                [`(halt)
                 `(label ,l `(halt))]
                [`(prim ,op ,ae* ...)
@@ -55,8 +57,8 @@
         (define e (hash-ref saved l))
         (callback! l e)
         (match e
-               [`(halt)
-                 (void)]
+               [`(quote ,s) (void)]
+               [`(halt) (void)]
                [`(prim ,op ,ae* ...)
                  (map (lambda (l) (iter callback! l)) ae*)]
                [`(set!/k ,x ,aev ,aek)
@@ -76,23 +78,39 @@
         (void))
 
 
+; Valid PrimList opsA
+(define primlistops '(list append cons cdr car reverse memq member vector-ref make-vector))
+
 
 ; ARGSN
-(define ARGSN 1)
+(define ARGSN 2)
 (define (build-ARGSN! l e)
-        (when (not (or (not (list? e))
-                       (member (first e) '(prim set!/k if lambda halt))))
-              ; e is a callsite
-              (when (> (- (length e) 1) 0)
-                    (set! ARGSN (max ARGSN (- (length e) 1))))))
+        ; e is a primlist
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              (set! ARGSN (max ARGSN (- (length e) 3))))
+        ; e is a callsite
+        (when (and (not (or (not (list? e))
+                            (member (first e) '(prim set!/k if lambda halt))))
+                   (> (- (length e) 1) 0))
+              (set! ARGSN (max ARGSN (- (length e) 1)))))
 (iter build-ARGSN!)
+
+
+; primlistmax
+(define primlistmax 0)
+(define (build-primlistmax! l e)
+        (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops))
+              ; e is a primlist
+              (when (> (- (length e) 3) 0)
+                    (set! primlistmax (max primlistmax (- (length e) 3))))))
+(iter build-primlistmax!)
 
 
 ;; Build S
 
 (define S '())
 (define (build-S! l e)
-        (when (and (list? e) (not (equal? (first e) 'lambda)))
+        (when (and (list? e) (not (member (first e) '(lambda quote))))
               (set! S (cons l S))))
 (iter build-S!)
 
@@ -117,14 +135,40 @@
 (iter build-LAM!)
 (define L (set->list LAM))
 
-(define B '(VOID TRUE FALSE INT))
-(define V (append L B))
+
+(define INTLOCS (set))
+(define (build-INTLOCS! l e)
+        (when (number? e)
+              ; e is a literal
+              (set! INTLOCS (set-add INTLOCS l))))
+(iter build-INTLOCS!)
+(define I (set->list INTLOCS))
+
+(define SYMLOCS (set))
+(define (build-SYMLOCS! l e)
+        (when (and (list? e) (equal? (first e) 'quote))
+              ; e is a literal
+              (set! SYMLOCS (set-add SYMLOCS l))))
+(iter build-SYMLOCS!)
+(define SY (set->list SYMLOCS))
+
+(define B '(SYM LIST VOID TRUE FALSE INT))
+(define V (append L I SY B))
 (define A (append X V))
 
+
+(define allprims (set))
+(define (build-allprims! l e)
+        (when (and (list? e) (equal? (first e) 'prim))
+              (set! allprims (set-add allprims (second e)))))
+(iter build-allprims!)
 
 
 ; lengths
 (define lenV (length V)) 
+(define lenI (length I)) 
+(define lenSY (length SY)) 
+(define lenL (length L)) 
 (define lenA (length A)) 
 (define lenS (length S)) 
 (define lenX (length X)) 
@@ -140,8 +184,15 @@
 ;(pretty-print CLO)
 ;(pretty-print X)
 ;(pretty-print T)
-;(pretty-print V)
+(pretty-print (hash-ref saved 8706))
 ;(pretty-print root)
+
+
+; print out all prims
+;(pretty-print allprims)
+
+;(pretty-print saved)
+;(pretty-print (list-ref V 96))
 
 
 
@@ -168,9 +219,10 @@
         (define ae (hash-ref saved ael))
         (cond [(symbol? ae)
                (- lenX (length (member ae X)))]
-              [(number? ae) (- lenA 1)]  ;;;;;;;;;;; this needs to change as B changes
+              [(number? ae) (+ lenX lenL (- lenI (length (member ael I))))]
               [(equal? ae #t) (- lenA 3)]  ;;;;;;;;;;; this needs to change as B changes 
               [(equal? ae #f) (- lenA 2)]  ;;;;;;;;;;; this needs to change as B changes 
+              [(and (list? ae) (equal? (first ae) 'quote)) (+ lenX lenL lenI (- lenSY (length (member ael SY))))]
               [(and (list? ae) (equal? (first ae) 'lambda))
                (define clooff (find-clo ael))
                (+ lenX clooff)]))
@@ -319,13 +371,14 @@
               (define l (car remV))
               (when (hash-has-key? saved l)
                     (define e (hash-ref saved l))
-                    (define bodyl (third e))
-                    (define soff (find-state bodyl))
-                    (display cV out)
-                    (display " " out)
-                    (display soff out)
-                    (newline out))
-                    (display-Body (+ 1 cV) (cdr remV))))
+                    (when (and (list? e) (equal? (first e) 'lambda))
+                          (define bodyl (third e))
+                          (define soff (find-state bodyl))
+                          (display cV out)
+                          (display " " out)
+                          (display soff out)
+                          (newline out)))
+              (display-Body (+ 1 cV) (cdr remV))))
 (display-Body 0 V)
 (newline out)
 (pretty-print 7)
@@ -345,6 +398,20 @@
                       (define l (car remS))
                       (define e (hash-ref saved l))
                       (when (and (list? e) (equal? (first e) 'set!/k) (< i 3))
+                            (define ae (list-ref e i))
+                            (define aoff (ae->A ae))
+                            (display cS out)
+                            (display " " out)
+                            (display aoff out)
+                            (newline out))
+                      (when (and (list? e) (equal? (first e) 'prim) (member (second e) primlistops) (<= i (- (length e) 3)))
+                            (define ae (list-ref e (+ 1 i)))
+                            (define aoff (ae->A ae))
+                            (display cS out)
+                            (display " " out)
+                            (display aoff out)
+                            (newline out))
+                      (when (and (list? e) (equal? (first e) 'if) (= i 1))
                             (define ae (list-ref e i))
                             (define aoff (ae->A ae))
                             (display cS out)
@@ -381,7 +448,7 @@
                       (define vl (car remV))
                       (when (hash-has-key? saved vl)
                            (define e (hash-ref saved vl))
-                           (when (< (- i 1) (length (second e))) 
+                           (when (and (list? e) (equal? (first e) 'lambda) (< (- i 1) (length (second e))))
                                  (define ail (list-ref (second e) (- i 1)))
                                  (define xoff (- lenX (length (member (hash-ref saved ail) X))))
                                  (display cV out)
@@ -398,7 +465,7 @@
 ;; Write Tables Call_i
 (define (write-calli i)
         (display "Call" out)
-        (display i out)
+        (display (- i 1) out)
         (display " " out)
         (display lenS out)
         (display " 1" out)
@@ -409,14 +476,14 @@
                       (define e (hash-ref saved l))
                       (when (and (not (or (not (list? e))
                                           (member (first e) '(prim set!/k if lambda halt))))
-                                 (= i (- (length e) 1)))
+                                 (= (- i 1) (- (length e) 1)))
                             (display cS out)
                             (display " 0" out)
                             (newline out))
                       (display-Call (+ 1 cS) (cdr remS))))
         (display-Call 0 S)
         (newline out))
-(forupto write-calli ARGSN)
+(forupto write-calli (+ 1 ARGSN))
 (pretty-print 4)
 
 
@@ -459,7 +526,7 @@
 
 
 ;; Write table PrimINT
-(display "PrimInt " out)
+(display "PrimNum " out)
 (display lenS out)
 (display " 1" out)
 (newline out)
@@ -467,9 +534,9 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * /)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(+ - * / sqrt expt max min vector-length length exact->inexact fl+ fl- fl/ fl* flsin modulo)))
                     (display cS out)
-                    (display "0 " out)
+                    (display " 0" out)
                     (newline out))
               (display-PrimINT (+ 1 cS) (cdr remS))))
 (display-PrimINT 0 S)
@@ -486,7 +553,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal?)))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(< > <= >= = equal? null? not and or fl> fl<)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -505,7 +572,7 @@
         (when (not (null? remS))
               (define l (car remS))
               (define e (hash-ref saved l))
-              (when (and (list? e) (equal? (first e) 'prim) (equal? (second e) 'void))
+              (when (and (list? e) (equal? (first e) 'prim) (member (second e) '(void print pretty-print vector-set!)))
                     (display cS out)
                     (display " 0" out)
                     (newline out))
@@ -513,6 +580,33 @@
 (display-PrimVoid 0 S)
 (newline out)
 (pretty-print 0)
+
+
+
+;; Write table PrimLIST
+(define (write-primlisti i)
+        (display "PrimList" out)
+        (display (- i 1) out)
+        (display " " out)
+        (display lenS out)
+        (display " 1" out)
+        (newline out)
+        (define (display-PrimList cS remS)
+                (when (not (null? remS))
+                      (define l (car remS))
+                      (define e (hash-ref saved l))
+                      (when (and (list? e) 
+                                 (equal? (first e) 'prim) 
+                                 (member (second e) primlistops)
+                                 (= (- i 1) (- (length e) 3)))
+                            (display cS out)
+                            (display " 0" out)
+                            (newline out))
+                      (display-PrimList (+ 1 cS) (cdr remS))))
+        (display-PrimList 0 S)
+        (newline out))
+(forupto write-primlisti (+ 1 primlistmax))
+(pretty-print 1)
 
 
 

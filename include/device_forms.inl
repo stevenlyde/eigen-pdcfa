@@ -333,9 +333,8 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid()
 {
 	cudaEvent_t count_entries;
 	checkCudaErrors( cudaEventCreateWithFlags(&count_entries, 0) );
-	
+
 	AND_OP<VALUE_TYPE> (r_prime, PrimVoid, s[STREAM_VOID], stream_Void);
-	DEBUG_PRINT("s[STREAM_VOID]: ", s[STREAM_VOID]);
 	count(s[STREAM_VOID], 1, &entry_count_host[STREAM_VOID], &entry_count_device[STREAM_VOID], stream_Void);
 	checkCudaErrors(cudaEventRecord(count_entries, stream_Void));
 	checkCudaErrors(cudaStreamWaitEvent(stream_Void, count_entries, 0));

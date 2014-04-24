@@ -123,7 +123,7 @@ count(	const VALUE_TYPE *a,
 	for(int i=tID; i < size; i+=grid_size)
 	{
 		if(a[i] == val)
-			count[i]++;
+			count[tID]++;
 	}
 	__syncthreads();
 

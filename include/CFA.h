@@ -59,7 +59,7 @@
 #define CPU         0
 #define GPU         1
 //#define MULTI_GPU   2
-#define BUILD_TYPE  GPU         //0 is CPU 1 is GPU
+#define BUILD_TYPE  CPU         //0 is CPU 1 is GPU
 
 bool compare_entry(const std::pair<int,int> &a, const std::pair<int,int> &b)
 {
@@ -101,26 +101,19 @@ private:
 #if BUILD_TYPE == CPU
     cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp_Mat[8];
     cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondTrue;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondFalse;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Body;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Fun;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Arg[ARG_MAX];
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Var[ARG_MAX];
 #elif BUILD_TYPE == GPU
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp_Mat[4*NUM_STREAMS];
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> sigma;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> CondTrue;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> CondFalse;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Body;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Fun;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Arg[ARG_MAX];
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Var[ARG_MAX];
 
     INDEX_TYPE *entry_count_host, *entry_count_device;
     shared_store shared_sigma;
 #endif
-    
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> CondTrue;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> CondFalse;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Body;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Fun;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Arg[ARG_MAX];
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Var[ARG_MAX];
 
 #if BUILD_TYPE == GPU
     cudaStream_t stream_Call;
@@ -241,10 +234,10 @@ public:
     void WriteStore();
 
     //GPU calls
-    void GPU_Init();
+    void Init_CPU();
 
     //CPU calls
-    void CPU_Init();
+    void Init_GPU();
 
     //Debug functions
 };

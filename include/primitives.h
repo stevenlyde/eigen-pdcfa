@@ -101,7 +101,6 @@ void count(	const cusp::array1d<VALUE_TYPE, cusp::device_memory> &a,
 	const size_t NUM_BLOCKS = 1;
 	const size_t BLOCK_SIZE = 512;
 
-	fprintf(stderr, "count: a.size: %d\n", a.size());
 	count<INDEX_TYPE, VALUE_TYPE, 512> <<<NUM_BLOCKS, BLOCK_SIZE, 0, stream>>> (
 			TPC(&a[0]),
 			val,

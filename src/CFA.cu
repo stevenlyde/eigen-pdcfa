@@ -76,8 +76,9 @@ size_t shared_store::pitch = 0;
 size_t shared_store::num_entries = 0;
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init_CPU()
 {
+#if BUILD_TYPE == CPU
 	size_t vec_size = sigma.num_rows;
 	VOID_vec.resize(vec_size, 0);
 	NOT_FALSE_vec.resize(vec_size, 1);
@@ -100,16 +101,9 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
 		if(PrimList[i].size() != r.size())
 			PrimList[i].resize(r.size(), 0);
 	}
-#if(BUILD_TYPE == GPU)
-	for(int i=0; i<NUM_STREAMS; ++i)
-	{
-		a_var[i].resize(sigma.num_cols, 0);
-	    vf[i].resize(vec_size, 0);
-	}
-#else
+
 	a_var.resize(sigma.num_cols, 0);
 	vf.resize(vec_size, 0);
-#endif
     a_set.resize(sigma.num_cols, 0);
     v_set.resize(vec_size, 0);
     v_cond.resize(vec_size, 0);
@@ -133,16 +127,67 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
 			NUM_vec[i] = 1;
 	}
 
-	#if(BUILD_TYPE == GPU)
-    cudaStreamCreate(&stream_Call);
-    cudaStreamCreate(&stream_List);
-    cudaStreamCreate(&stream_Set);
-    cudaStreamCreate(&stream_IF);
-    cudaStreamCreate(&stream_Num);
-    cudaStreamCreate(&stream_Bool);
-    cudaStreamCreate(&stream_Void);
+	s.resize(r.size(), 0);
+	s_indices.resize(r.size(), 0);
+#endif
+}
 
-	a_indices.resize(sigma.num_cols, 0);
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init_GPU()
+{
+#if BUILD_TYPE == GPU
+	size_t vec_size = sigma.num_rows;
+	VOID_vec.resize(vec_size, 0);
+	NOT_FALSE_vec.resize(vec_size, 1);
+	FALSE_vec.resize(vec_size, 0);
+	BOOL_vec.resize(vec_size, 0);
+	NUM_vec.resize(vec_size, 0); 
+	LIST_vec.resize(vec_size, 0);
+	tb.resize(1, 0);
+	fb.resize(1, 0);
+	AND_vec1.resize(r.size(), 0);
+	AND_vec2.resize(r.size(), 0);
+
+	for(int i=0; i<ARG_MAX; ++i)
+	{
+		v[i].resize(vec_size, 0);
+		a[i].resize(sigma.num_cols, 0);
+		
+		if(Call[i].size() != r.size())
+			Call[i].resize(r.size(), 0);
+		if(PrimList[i].size() != r.size())
+			PrimList[i].resize(r.size(), 0);
+	}
+
+	for(int i=0; i<NUM_STREAMS; ++i)
+	{
+		a_var[i].resize(sigma.num_cols, 0);
+	    vf[i].resize(vec_size, 0);
+	}
+    a_set.resize(sigma.num_cols, 0);
+    v_set.resize(vec_size, 0);
+    v_cond.resize(vec_size, 0);
+    v_list.resize(vec_size, 0);
+
+	for(int i=0; i<vec_size; ++i)
+	{
+		if(i == vec_size - 5)			//list
+			LIST_vec[i] = 1;			
+		else if(i == vec_size - 4)		//void
+			VOID_vec[i] = 1;
+		else if(i == vec_size - 3)		//#t
+			BOOL_vec[i] = 1;
+		else if(i == vec_size - 2)		//#f
+		{
+			NOT_FALSE_vec[i] = 0;
+			BOOL_vec[i] = 1;
+			FALSE_vec[i] = 1;
+		}
+		else if(i == vec_size - 1)		//NUM
+			NUM_vec[i] = 1;
+	}
+
+    a_indices.resize(sigma.num_cols, 0);
 	v_indices.resize(vec_size, 0);
 	for(int i=0; i<NUM_STREAMS; ++i)
 	{
@@ -160,10 +205,15 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Init()
 	Cond_vec.resize(CondTrue.num_rows);
 	for(int i=0; i<4*NUM_STREAMS; ++i)
 		temp_Mat[i].resize(sigma.num_rows, sigma.num_cols, 0, std::max(sigma.num_cols/20, ulong(32)), 32);
-	#else
-	s.resize(r.size(), 0);
-	s_indices.resize(r.size(), 0);
-	#endif
+
+	cudaStreamCreate(&stream_Call);
+    cudaStreamCreate(&stream_List);
+    cudaStreamCreate(&stream_Set);
+    cudaStreamCreate(&stream_IF);
+    cudaStreamCreate(&stream_Num);
+    cudaStreamCreate(&stream_Bool);
+    cudaStreamCreate(&stream_Void);
+#endif
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
@@ -183,6 +233,8 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 	{
 		int rows, cols, i, j;
 		char buf[64], name[32];
+		valid_Call.resize(ARG_MAX);
+		valid_List.resize(ARG_MAX);
 
 		tf.getline(buf, 64);
 		if(tf.gcount() > 1)
@@ -241,7 +293,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 				}
 			}
 
-			if(ID == 0)
+			if(ID == 0 && A.num_entries > 0)
 			{
 				fprintf(stderr, "\n%s (%d x %d) with %d entries\n", name, A.num_rows, A.num_cols, A.num_entries);
 				fprintf(stderr, "B: (%d x %d)\n", B.num_rows, B.num_cols);
@@ -263,25 +315,32 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 					shared_sigma.pitch = B.num_rows;
 					shared_sigma.num_entries = B.num_entries;
 
-					size_t index_size = shared_sigma.pitch  * shared_sigma.num_cols_per_row * sizeof(INDEX_TYPE);
-					size_t values_size = shared_sigma.pitch * shared_sigma.num_cols_per_row * sizeof(VALUE_TYPE);
+					//size_t index_size = shared_sigma.pitch  * shared_sigma.num_cols_per_row * sizeof(INDEX_TYPE);
+					//size_t values_size = shared_sigma.pitch * shared_sigma.num_cols_per_row * sizeof(VALUE_TYPE);
 
-					checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_column_indices, index_size, cudaHostAllocMapped));
-					checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_values, values_size, cudaHostAllocMapped));
+					// checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_column_indices, index_size, cudaHostAllocMapped));
+					// checkCudaErrors(cudaHostAlloc((void **)&shared_sigma.host_values, values_size, cudaHostAllocMapped));
+
+					size_t entry_count_size = 32*sizeof(INDEX_TYPE);
+					checkCudaErrors( cudaHostAlloc((void **)&entry_count_host, entry_count_size, 0));
+					checkCudaErrors( cudaMalloc((void **)&entry_count_device, entry_count_size));
+					memset(entry_count_host, 0, entry_count_size);
+					checkCudaErrors( cudaMemcpy(entry_count_device, entry_count_host, entry_count_size, cudaMemcpyHostToDevice) );
 				}
 				#pragma omp barrier
-				checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.column_indices, (void *)shared_sigma.host_column_indices, 0));
-				checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.values, (void *)shared_sigma.host_values, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.column_indices, (void *)shared_sigma.host_column_indices, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&shared_sigma.values, (void *)shared_sigma.host_values, 0));
+				//checkCudaErrors(cudaHostGetDevicePointer((void **)&entry_count_device, (void *)entry_count_host, 0));
 				#pragma omp barrier
 				cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp;
 				temp = B;
-
-				//set sigma for legacy code....   hack (fix later)
-				sigma.resize(shared_sigma.num_rows, shared_sigma.num_cols, 0, 1);
 				LoadEllMatrix(temp, sigma);
-				LoadEllMatrix(temp, shared_sigma);
-				fprintf(stderr, "shared_sigma.num_cols: %d\n", shared_sigma.num_cols);
-				fprintf(stderr, "shared_sigma.num_rows: %d\n", shared_sigma.num_rows);
+				int num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+				fprintf(stderr, "num_entries: %d\n", num_entries);
+
+				// LoadEllMatrix(temp, shared_sigma);
+				// fprintf(stderr, "shared_sigma.num_cols: %d\n", shared_sigma.num_cols);
+				// fprintf(stderr, "shared_sigma.num_rows: %d\n", shared_sigma.num_rows);
 #endif
 				if(ID == 0)
 					print_matrix_info(sigma);
@@ -324,6 +383,11 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 			}
 			else if(sname == "Call")
 			{
+				if(A.num_entries > 0)
+					valid_Call[mat_num] = true;
+				else
+					valid_Call[mat_num] = false;
+
 				Call[mat_num] = vec;
 				if(m_maxCall < mat_num)
 					m_maxCall = mat_num;
@@ -336,6 +400,11 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 				PrimVoid = vec;
 			else if(sname == "PrimList")
 			{
+				if(A.num_entries > 0)
+					valid_List[mat_num] = true;
+				else
+					valid_List[mat_num] = false;
+
 				PrimList[mat_num] = vec;
 				if(m_maxList < mat_num)
 					m_maxList = mat_num;
@@ -357,20 +426,22 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 {
 	int ID = omp_get_thread_num();
 	fprintf(stdout, "\n\n\nStarting analysis: %d\n", ID);
-	
+
+	int prev_num_entries = sigma.num_entries;
 	r_prime = r;
-	sigma_prime = sigma;
 	int iter=0;
-	bool sigma_change = false, r_change = false;
+	bool sigma_change = true, r_change = true;
 	fprintf(stderr, "m_maxCall: %d  m_maxList: %d\n", m_maxCall, m_maxList);
 
 	//#pragma omp parallel num_threads(NUM_STREAMS)
 	do
 	{
+		//int ID = omp_get_thread_num();
+		//fprintf(stderr, "thread ID: %d\n", ID);
+		iter++;
 		if(ID == 0)
-			fprintf(stdout, "\n\nITERATION %d\n\n", ++iter);
+			fprintf(stdout, "\n\nITERATION %d\n\n", iter);
 
-#if BUILD_TYPE == GPU
 		//if(ID == 1)
 		 	f_call();
 		//if(ID == 2)
@@ -382,71 +453,35 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 		//if(ID == 5)
 		 	f_primBool();
 		//if(ID == 6)
-		 	f_primNum();
+			f_primNum();
 		//if(ID == 7)
 			f_primVoid();
-#else
-		f_call();
-		f_list();
-		f_set();
-		f_if();
-	 	f_primBool();
-	 	f_primNum();
-		f_primVoid();
-#endif
 
 	//#pragma omp barrier
-		if(ID == 0)
+		if(ID == 0 && iter % 5 == 0)
 		{
 			fprintf(stdout, "\nupdate sigma\n");
 		#if BUILD_TYPE == GPU
-			#if MULTI_GPU == 2
-			int count = 0;
-			for(int row=0; row<shared_sigma.num_rows; ++row)
-			{
-				int offset = row;
-				for(int col=0; col < shared_sigma.num_cols_per_row; ++col, offset+=shared_sigma.pitch)
-				{
-					if(shared_sigma.column_indices[offset] != -1)
-						count++;
-				}
-			}
-			shared_sigma.num_entries = count;
-			#else
-			sigma_prime.num_entries = thrust::count_if(sigma_prime.column_indices.values.begin(), sigma_prime.column_indices.values.end(), is_non_negative());
-			//DEBUG_PRINT("sigma_prime", sigma_prime);
-			fprintf(stderr, "num_entries: %d  %d\n", sigma.num_entries, sigma_prime.num_entries);
-			#endif
+			sigma.num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+			fprintf(stderr, "num_entries: %d  %d\n", prev_num_entries, sigma.num_entries);
+			//DEBUG_PRINT("sigma", sigma);
+
+			//#endif
 		#else
-			//sigma_prime.num_entries = thrust::count_if(sigma_prime.column_indices.values.begin(), sigma_prime.column_indices.values.end(), is_non_negative());
-			//thrust::fill(sigma_prime.values.begin(), sigma_prime.values.end(), 1);
+			//sigma.num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
+			//thrust::fill(sigma.values.begin(), sigma.values.end(), 1);
 		#endif
 
-			#if MULTI_GPU == 2
-				if(sigma.num_entries != shared_sigma.num_entries)
-					sigma_change = true;
-				else
-					sigma_change = false;
-				sigma.num_entries = shared_sigma.num_entries;
-			#else
-				if(sigma.num_entries != sigma_prime.num_entries)
-					sigma_change = true;
-				else
-					sigma_change = false;
-				sigma.num_entries = sigma_prime.num_entries;
-			#endif
+			if(prev_num_entries != sigma.num_entries)
+				sigma_change = true;
+			else
+				sigma_change = false;
+			prev_num_entries = sigma.num_entries;
 
 			fprintf(stdout, "\nupdate r\n");
 			int r_entries = thrust::count(r.begin(), r.end(), 1);
 			int r_prime_entries = thrust::count(r_prime.begin(), r_prime.end(), 1);
 
-			//DEBUG_PRINT("r: ", r);
-			// if(debug)
-			// {
-			// 	fprintf(stdout, "***r difference***\n");
-			// 	cusp::print(temp_r);
-			// 	cusp::print(r_prime);
-			// }
 			if(r_entries != r_prime_entries)
 				r_change = true;
 			else
@@ -460,6 +495,19 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 
 	//#pragma omp barrier
 	} while(r_change || sigma_change);
+
+	// for(int row=0; row<sigma.num_rows; ++row)
+	// {
+	// 	int count = 0;
+	// 	int offset = row;
+	// 	for(int col=0; col < sigma.column_indices.num_cols; ++col, offset+=sigma.column_indices.pitch)
+	// 	{
+	// 		if(sigma.column_indices.values[offset] != -1)
+	// 			count++;
+	// 	}
+	// 	if(count == sigma.column_indices.num_cols)
+	// 		fprintf(stderr, "row: %d is full\n", row);
+	// }
 
 	fprintf(stdout, "Analysis Complete...\n");
 }
@@ -497,7 +545,7 @@ void Test(std::string filename)
 	CFA<int, int, cusp::host_memory> Analysis;
 
 	Analysis.ReadTestFile(filename.c_str());
-	Analysis.Init();
+	Analysis.Init_CPU();
 
 	startTime = omp_get_wtime();
 	Analysis.Run_Analysis();
@@ -515,7 +563,7 @@ void Test(std::string filename)
 		CFA<int, int, cusp::device_memory> Analysis;
 
 		Analysis.ReadTestFile(filename.c_str());
-		Analysis.Init();
+		Analysis.Init_GPU();
 
 	#pragma omp barrier
 

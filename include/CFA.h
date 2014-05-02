@@ -38,14 +38,15 @@
 #include <cusp/blas.h>
 #include <cusp/print.h>
 
-#define NUM_GPUS        8
+#define NUM_GPUS        1
 #define ARG_MAX         512
 #define BLOCKS          32
 #define BLOCK_THREADS   256
 #define NUM_STREAMS     8
 
-#define MEMORY_ALIGNMENT  4096
-#define ALIGN_UP(x,size) ( ((size_t)x+(size-1))&(~(size-1)) )
+#define MEMORY_ALIGNMENT    4096
+#define ALIGN_UP(x,size)    ( ((size_t)x+(size-1))&(~(size-1)) )
+#define ROUND_UP(x,y)       ( (x + y-1) / y )  
 
 #define STREAM_CALL     0
 #define STREAM_LIST     1
@@ -57,8 +58,8 @@
 
 #define CPU         0
 #define GPU         1
-#define MULTI_GPU   2
-#define BUILD_TYPE  GPU         //0 is CPU 1 is GPU
+//#define MULTI_GPU   2
+#define BUILD_TYPE  CPU         //0 is CPU 1 is GPU
 
 bool compare_entry(const std::pair<int,int> &a, const std::pair<int,int> &b)
 {
@@ -100,27 +101,19 @@ private:
 #if BUILD_TYPE == CPU
     cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp_Mat[8];
     cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma_prime;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondTrue;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> CondFalse;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Body;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Fun;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Arg[ARG_MAX];
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> Var[ARG_MAX];
 #elif BUILD_TYPE == GPU
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp_Mat[4*NUM_STREAMS];
     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> sigma;
-    cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> sigma_prime;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> CondTrue;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> CondFalse;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Body;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Fun;
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Arg[ARG_MAX];
-    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> Var[ARG_MAX];
 
+    INDEX_TYPE *entry_count_host, *entry_count_device;
     shared_store shared_sigma;
 #endif
-    
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> CondTrue;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> CondFalse;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Body;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Fun;
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Arg[ARG_MAX];
+    cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> Var[ARG_MAX];
 
 #if BUILD_TYPE == GPU
     cudaStream_t stream_Call;
@@ -140,6 +133,7 @@ private:
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimNum;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> PrimList[ARG_MAX];
     cusp::array1d<VALUE_TYPE, MEM_TYPE> Call[ARG_MAX];
+    std::vector<bool> valid_Call, valid_List;
 
     cusp::array1d<VALUE_TYPE, MEM_TYPE> r;
     cusp::array1d<VALUE_TYPE, MEM_TYPE> r_prime;
@@ -240,10 +234,10 @@ public:
     void WriteStore();
 
     //GPU calls
-    void GPU_Init();
+    void Init_CPU();
 
     //CPU calls
-    void CPU_Init();
+    void Init_GPU();
 
     //Debug functions
 };

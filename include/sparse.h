@@ -1,8 +1,6 @@
 #ifndef SPARSE_H
 #define SPARSE_H
 
-#include <cusp/array1d.h>
-#include <cusp/print.h>
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
 #include <thrust/scan.h>

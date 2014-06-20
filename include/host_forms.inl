@@ -154,11 +154,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_host(const cusp::array1d<VALU
 	//r_prime
 	temp_vec.resize(Body.num_rows);
 	cusp::multiply(Body, vf, temp_vec);
-	for(int i=0; i<temp_vec.size(); ++i)
-	{
-		if(temp_vec[i] == 1)
-			fprintf(stderr, "%d\n", i);
-	}
 	AccumVec(r_prime, temp_vec);
 }
 

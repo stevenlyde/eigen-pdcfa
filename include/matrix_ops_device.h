@@ -199,7 +199,7 @@ OuterProductAdd_ELL(	const VALUE_TYPE *a,
 		for(INDEX_TYPE k=tID; k < num_entries_b; k+=WARP_SIZE)
 		{
 			VALUE_TYPE b_col = b[k];
-			INDEX_TYPE offset = row+pitch;
+			INDEX_TYPE offset = row;
 			for(INDEX_TYPE n=1; n < num_cols_per_row; ++n, offset+=pitch)
 			{
 				INDEX_TYPE col = column_indices[offset];
@@ -209,7 +209,7 @@ OuterProductAdd_ELL(	const VALUE_TYPE *a,
 				}
 				else if(col == invalid_index)
 				{
-					column_indices[row + pitch*(atomicAdd(&row_index[wID],1)+1)] = b_col;
+					column_indices[row*(atomicAdd(&row_index[wID],1)+1)] = b_col;
 					//values[offset] = 1;
 					break;
 				}
@@ -234,6 +234,7 @@ OuterProductAdd_HYB(	const VALUE_TYPE *a,
 						const INDEX_TYPE num_cols,
 						const INDEX_TYPE num_cols_per_row,
 						const INDEX_TYPE pitch,
+						INDEX_TYPE *row_sizes,
 						INDEX_TYPE *column_indices,
 						INDEX_TYPE *coo_row_indices,
 						INDEX_TYPE *coo_column_indices)
@@ -269,11 +270,7 @@ OuterProductAdd_HYB(	const VALUE_TYPE *a,
 				}
 				else if(col == invalid_index)
 				{
-					//column_indices[row + pitch*(atomicAdd(&column_indices[row],1)+1)] = b_col;
-					//INDEX_TYPE = (++column_indices[row]);
-					column_indices[row]++;
-					INDEX_TYPE index = column_indices[row];
-					//INDEX_TYPE index = atomicAdd(&column_indices[row], 1) + 1;
+					INDEX_TYPE index = atomicAdd(&row_sizes[row], 1) + 1;
 					column_indices[row + pitch*index] = b_col;
 					break;
 				}
@@ -366,7 +363,7 @@ OuterProductAdd_DELL(	const VALUE_TYPE *a,
 			if(overflow)
 			{
 				bool valid = true;
-				for(int i=1; i < coo_column_indices[0]; ++i)
+				for(int i=1; i < coo_column_indices[0]+1; ++i)
 				{
 					if(coo_column_indices[i] == b_col && coo_row_indices[i] == row)
 					{
@@ -377,9 +374,13 @@ OuterProductAdd_DELL(	const VALUE_TYPE *a,
 
 				if(valid)
 				{
-					int index = atomicAdd(&coo_column_indices[0], 1)+1;
-					coo_row_indices[index] = row;
-					coo_column_indices[index] = b_col;
+					int index = coo_column_indices[0]+1;
+					if(atomicCAS(&coo_column_indices[index], 0, b_col) == 0)
+					{
+						atomicAdd(&coo_column_indices[0], 1);
+						coo_row_indices[index] = row;
+						coo_column_indices[index] = b_col;
+					}
 				}
 			}
 		}
@@ -678,7 +679,7 @@ LoadEllMatrix(	const INDEX_TYPE num_rows,
 	{
 		INDEX_TYPE row_start = src_row_offsets[row];
 		INDEX_TYPE row_end = src_row_offsets[row + 1];
-		INDEX_TYPE offset = row + pitch;
+		INDEX_TYPE offset = row;
 
 		dst_column_indices[row] = (row_end - row_start);
 		for(int j=row_start; j < row_end; ++j, offset+=pitch)
@@ -704,6 +705,7 @@ LoadHybMatrix(	const INDEX_TYPE num_rows,
 				const INDEX_TYPE pitch,
 				const INDEX_TYPE *src_row_offsets,
 				const INDEX_TYPE *src_column_indices,
+				INDEX_TYPE *dst_row_sizes,
 				INDEX_TYPE *dst_column_indices,
 				INDEX_TYPE *dst_coo_row_indices,
 				INDEX_TYPE *dst_coo_column_indices)
@@ -716,7 +718,7 @@ LoadHybMatrix(	const INDEX_TYPE num_rows,
 	{
 		INDEX_TYPE row_start = src_row_offsets[row];
 		INDEX_TYPE row_end = src_row_offsets[row + 1];
-		INDEX_TYPE offset = row + pitch;
+		INDEX_TYPE offset = row;
 
 		dst_column_indices[row] = (row_end - row_start);
 		for(int j=row_start; j < row_end; ++j, offset+=pitch)
@@ -724,6 +726,7 @@ LoadHybMatrix(	const INDEX_TYPE num_rows,
 			if(offset < num_cols_per_row * pitch)
 			{	
 				dst_column_indices[offset] = src_column_indices[j];
+				atomicAdd(&dst_row_sizes[row], 1);
 			}
 			else
 			{

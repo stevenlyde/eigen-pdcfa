@@ -308,11 +308,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::ReadTestFile(const char* filename)
 				cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> temp;
 				temp = B;
 				LoadMatrix(temp, sigma);
-				
-				INDEX_TYPE val = sigma.coo.column_indices[0];
-				sigma.num_entries = thrust::reduce(sigma.row_sizes.begin(), sigma.row_sizes.end()) + val;
-				//cusp::print(sigma.row_sizes);
-				//debug_print(sigma);
+				sigma.num_entries = CountEntries(sigma);
 
 				if(ID == 0)
 					print_matrix_info(sigma);
@@ -419,50 +415,68 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 			fprintf(stdout, "\n\nITERATION %d\n\n", iter);
 		}
 
-		if(iter == 61)
-			debug = true;
-		else
-			debug = false;
+		int old_coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		int coo_size;
 
 		//if(ID == 1)
 			f_call();
 
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
+
 		//if(ID == 2)
 		 	f_list();
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
 
 		//if(ID == 3)
 			f_set();
-
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
 		//if(ID == 4)
 			f_if();
-
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
 		//if(ID == 5)
 			f_primBool();
-
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
 		//if(ID == 6)
 			f_primNum();
-
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
 		//if(ID == 7)
 			f_primVoid();
+		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
+		if(old_coo_size != coo_size)
+		{
+			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
+		}
+
 
 		if(ID == 0 && iter % ITER_COUNT == 0)
 		{
 			fprintf(stdout, "\nupdate sigma\n");
 		#if BUILD_TYPE == GPU
-			INDEX_TYPE val = sigma.coo.column_indices[0];
-			sigma.num_entries = thrust::reduce(sigma.row_sizes.begin(), sigma.row_sizes.end()) + val;
-			
-			// cusp::array1d<INDEX_TYPE, cusp::host_memory> temp_sizes = sigma.row_sizes;
-			// for(int i=0; i<temp_sizes.size(); ++i)
-			// {
-			// 	int val = temp_sizes[i];
-			// 	if(val >= 32)
-			// 		fprintf(stderr, "**row %d full...\n", i);
-			// }
-			// fprintf(stderr, "num_entries: %d  coo_size: %d\n", sigma.num_entries, val);
-			//cusp::print(sigma.row_sizes);
-			//DEBUG_PRINT("sigma ", sigma);
-			//debug_print(sigma);
+			sigma.num_entries = CountEntries(sigma);
 
 			if(prev_num_entries != sigma.num_entries)
 				sigma_change = true;
@@ -479,18 +493,12 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 			else
 				r_change = false;
 
+			int val = sigma.coo.column_indices[0];
+			fprintf(stderr, "coo entries: %d\n", val);
+
 			//DEBUG_PRINT("r: ", r);
+			//DEBUG_PRINT("r_prime: ", r_prime);
 			r = r_prime;
-
-			cusp::array1d<VALUE_TYPE, cusp::host_memory> temp = r;
-			for(int i=0; i<temp.size(); i++)
-			{
-				if(i % 100 == 0)
-					fprintf(stderr, "\n");
-				fprintf(stderr, "%d ", temp[i]);
-			}
-			fprintf(stderr, "\n");
-
 			fprintf(stderr, "sigma.num_entries: %d\n", sigma.num_entries);
 		#else
 			//sigma.num_entries = thrust::count_if(sigma.column_indices.values.begin(), sigma.column_indices.values.end(), is_non_negative());
@@ -520,13 +528,16 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 
 	//#pragma omp barrier
 	} while(r_change || sigma_change);
-
-// #if BUILD_TYPE == GPU
-// 	debug_print(sigma);
-// #endif
+	
+	//cusp::print(sigma.row_sizes);
+	int sum = thrust::reduce(sigma.row_sizes.begin(), sigma.row_sizes.end());
+	fprintf(stderr, "sum: %d\n", sum);
+	cusp::print(sigma.coo.column_indices);
+	cusp::print(sigma.coo.row_indices);
 
 	fprintf(stdout, "Analysis Complete...\n");
 }
+
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
 void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::WriteStore()
@@ -572,7 +583,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CopyStore(	cusp::csr_matrix<INDEX_TY
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CopyStore(	cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
+void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CopyStore(	hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
 														cusp::coo_matrix<int, VALUE_TYPE, cusp::host_memory> &store)
 {
 #if BUILD_TYPE == GPU
@@ -580,21 +591,21 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CopyStore(	cusp::hyb_matrix<INDEX_TY
 	temp.resize(mat.num_rows, mat.num_cols, mat.num_entries);
 
     int offset = 0;
-    for(int row=0; row<mat.num_rows; ++row)
+    for(int row=0; row < mat.num_rows; ++row)
     {
-        INDEX_TYPE row_start = (*mat.row_offsets)[row];
-        INDEX_TYPE row_end = (*mat.row_offsets)[row+1];
+    	int num_cols_per_row = mat.matrix.ell.column_indices.num_cols;
+    	int pitch = mat.matrix.ell.column_indices.pitch;
 
-        for(int n=row_start; n < row_end; ++n, ++offset)
+        for(int n=row; n < num_cols_per_row; n+=pitch, offset++)
         {
-            temp.row_indices[offset] = row;
-            temp.column_indices[offset] = (*mat.column_indices)[n];
+        	temp.row_indices[offset] = row;
+            temp.column_indices[offset] = mat.matrix.ell.column_indices.values[n];
         }
     }
 
     cusp::transpose(temp, store);
 #else
-	cusp::transpose(mat, store);
+	cusp::transpose(mat.matrix, store);
 #endif
 }
 
@@ -668,7 +679,7 @@ void Test(std::string filename)
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat)
+unsigned int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat)
 {
 	cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp(mat);
 	const INDEX_TYPE invalid_index = cusp::ell_matrix<int, INDEX_TYPE, cusp::device_memory>::invalid_index;
@@ -687,4 +698,21 @@ int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(cusp::ell_matrix<INDEX_T
 	temp.num_entries = num_entries;
 
 	return num_entries;
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+unsigned int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat)
+{
+    //INDEX_TYPE val = mat.matrix.coo.column_indices[0];
+    cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> temp = mat.matrix;
+	unsigned int val = mat.num_entries = thrust::count_if(mat.matrix.ell.column_indices.values.begin(), mat.matrix.ell.column_indices.values.end(), is_non_negative());
+	fprintf(stderr, "count entries: %d\n", val);
+	return val;
+}
+
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+unsigned int CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::CountEntries(dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat)
+{
+	INDEX_TYPE val = sigma.coo.column_indices[0];
+	return thrust::reduce(sigma.row_sizes.begin(), sigma.row_sizes.end()) + val;
 }

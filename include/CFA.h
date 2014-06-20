@@ -10,7 +10,7 @@
 
 #define MEMORY_ALIGNMENT    4096
 #define ALIGN_UP(x,size)    ( ((size_t)x+(size-1))&(~(size-1)) )
-#define ROUND_UP(x,y)       ( (x + y-1) / y )  
+#define ROUND_UP(x,y)       ( (x + y-1) / y )
 
 #define STREAM_CALL     0
 #define STREAM_LIST     1
@@ -109,11 +109,42 @@ struct dell_matrix         //dynamic ELL matrix
         row_offsetsB.resize(rows+1,0);
         row_sizes.resize(rows,0);
         coo.resize(rows, cols, coo_size);
-		coo.row_indices.resize(coo_size,0);
-		coo.column_indices.resize(coo_size,0);
+		coo.row_indices.resize(coo_size,-1);
+		coo.column_indices.resize(coo_size,-1);
 
         row_offsets = &row_offsetsA;
         column_indices = &column_indicesA;
+    }
+};
+
+template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+struct hyb_matrix         //dynamic ELL matrix
+{
+    cusp::array1d<INDEX_TYPE, MEM_TYPE> row_sizes;
+    cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> matrix;
+
+    size_t num_rows;
+    size_t num_cols;
+    size_t num_entries;
+
+    void resize(const size_t rows, const size_t cols, const size_t num_ell_entries, const size_t num_cols_per_row)
+    {
+        num_rows = rows;
+        num_cols = cols;
+        num_entries = num_ell_entries;
+
+        matrix.resize(rows, cols, num_ell_entries, 0, num_cols_per_row);
+        row_sizes.resize(rows, 0);
+    }
+
+    void resize(const size_t rows, const size_t cols, const size_t num_ell_entries, const size_t num_coo_entries, const size_t num_cols_per_row)
+    {
+        num_rows = rows;
+        num_cols = cols;
+        num_entries = num_ell_entries;
+
+        matrix.resize(rows, cols, num_ell_entries, num_coo_entries, num_cols_per_row);
+        row_sizes.resize(rows, 0);
     }
 };
 
@@ -131,6 +162,7 @@ private:
     cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> sigma;
 #elif BUILD_TYPE == GPU
     dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> sigma;
+    //hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> sigma;
 
     INDEX_TYPE *entry_count_host, *entry_count_device;
 
@@ -215,7 +247,9 @@ private:
     void f_primNum();
     void f_primVoid();
 
-    int CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat);
+    unsigned int CountEntries(cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &mat);
+    unsigned int CountEntries(dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat);
+    unsigned int CountEntries(hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat);
 
 #if(BUILD_TYPE == CPU)
     void f_call_host(const cusp::array1d<VALUE_TYPE, cusp::host_memory> &s, const int j);
@@ -237,7 +271,7 @@ private:
     void LoadMatrix(cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src,
                     cusp::ell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst);
     void LoadMatrix(cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src,
-                    cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst);
+                    hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst);
     void LoadMatrix(cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src,
                     dell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst);
 
@@ -269,12 +303,10 @@ public:
     void WriteStore();
     void CopyStore( cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
                     cusp::coo_matrix<int, VALUE_TYPE, cusp::host_memory> &store);
-    void CopyStore( cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
+    void CopyStore( hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
                     cusp::coo_matrix<int, VALUE_TYPE, cusp::host_memory> &store);
     void CopyStore( dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat,
                     cusp::coo_matrix<int, VALUE_TYPE, cusp::host_memory> &store);
-
-    void pretty_print(const cusp::array1d<INDEX_TYPE, MEM_TYPE> array);
 
     //GPU calls
     void Init_CPU();
@@ -357,6 +389,15 @@ struct is_non_negative
     }
 };
 
+struct is_positive
+{
+    __host__ __device__
+    bool operator()(const int &x)
+    {
+        return (x > 0);
+    }
+};
+
 template <typename INDEX_TYPE>
 struct mat_info
 {
@@ -377,14 +418,14 @@ inline void get_matrix_info(const dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> 
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-inline void get_matrix_info(const cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat, mat_info<INDEX_TYPE> &info)
+inline void get_matrix_info(const hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat, mat_info<INDEX_TYPE> &info)
 {
     info.num_rows = mat.num_rows;
     info.num_cols = mat.num_cols;
     info.num_entries = mat.num_entries;
-    info.num_entries_coo = mat.coo.row_indices.size();
-    info.num_cols_per_row = mat.ell.column_indices.num_cols;
-    info.pitch = mat.ell.column_indices.pitch;
+    info.num_entries_coo = mat.matrix.coo.row_indices.size();
+    info.num_cols_per_row = mat.matrix.ell.column_indices.num_cols;
+    info.pitch = mat.matrix.ell.column_indices.pitch;
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
@@ -406,7 +447,7 @@ inline void get_matrix_info(const cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, MEM_T
 }
 
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
-inline void print_matrix_info(cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat)
+inline void print_matrix_info(hyb_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat)
 {
     mat_info<INDEX_TYPE> info;
     get_matrix_info(mat, info);
@@ -441,7 +482,7 @@ inline void print_matrix_info(dell_matrix<INDEX_TYPE, VALUE_TYPE, MEM_TYPE> &mat
         info.num_rows, info.num_cols, info.num_entries);
 }
 
-template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
+template <typename INDEX_TYPE, typename VALUE_TYPE>
 void debug_print(const cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src_mat)
 {
     cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::host_memory> mat(src_mat);
@@ -476,19 +517,6 @@ void debug_print(const cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_mem
     }
 
     fprintf(stderr, "number of entries: %d\n", count);
-}
-
-template <typename INDEX_TYPE, typename MEM_TYPE>
-CFA::pretty_print(const cusp::array1d<INDEX_TYPE, MEM_TYPE> array)
-{
-    cusp::array1d<INDEX_TYPE, cusp::host_memory> temp = array;
-    for(int i=0; i<temp.size(); i++)
-    {
-        if(i % 100 == 0)
-            fprintf(stderr, "\n");
-        fprintf(stderr, "%d ", temp[i]);
-    }
-    fprintf(stderr, "\n");
 }
 
 #endif

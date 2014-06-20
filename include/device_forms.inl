@@ -16,33 +16,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_device(const cusp::array1d<VA
 	{
 		column_select(Fun, s_indices[sID], index, Fun_vec[sID], stream);
 		spmv(sigma, Fun_vec[sID], vf[sID], stream);
-
-		if(index == 0 && debug == true)
-		{
-			fprintf(stderr, "vf:\n");
-			int sval = s_indices[sID][index];
-			fprintf(stderr, "sval: %d\n", sval);
-			cusp::array1d<INDEX_TYPE, cusp::host_memory> temp = s;
-			for(int i=0; i < temp.size(); ++i)
-			{
-				int val = temp[i];
-				if(i % 100 == 0)
-					fprintf(stderr, "\n");
-				fprintf(stderr, "%d ", val);
-			}
-			fprintf(stderr, "\n");
-
-			temp = s_indices[sID];
-			for(int i=0; i < temp.size(); ++i)
-			{
-				int val = temp[i];
-				if(i % 100 == 0)
-					fprintf(stderr, "\n");
-				fprintf(stderr, "%d ", val);
-			}
-			fprintf(stderr, "\n");
-		}
-
 		AccumVec<VALUE_TYPE> (accum_vf_vec[sID], vf[sID], stream);
 
 		for(int i=0; i<j; ++i)
@@ -56,40 +29,16 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_device(const cusp::array1d<VA
 		{
 			gather_reduce(v[i], temp_row_indices[sID], index_count[sID], 0, stream);
 			gather_reduce(a[i], temp_col_indices[sID], index_count[sID], 1, stream);
-			// if(debug)
-			// {
-			// 	cusp::array1d<INDEX_TYPE, cusp::host_memory> temp1(temp_row_indices[sID]);
-			// 	cusp::array1d<INDEX_TYPE, cusp::host_memory> temp2(temp_col_indices[sID]);
-			// 	cusp::array1d<INDEX_TYPE, cusp::host_memory> temp3(index_count[sID]);
-			// 	bool row = false, col = false;
-			// 	for(int k=0; k<temp1.size(); ++k)
-			// 	{
-			// 		if(temp1[k] == 50 && k < temp3[0])
-			// 			row = true;
-
-			// 		if(temp1[k] == 0)
-			// 			break;
-			// 		fprintf(stderr, "%d ", temp1[k]);
-			// 	}
-			// 	fprintf(stderr, "\n");
-			// 	for(int k=0; k<temp2.size(); ++k)
-			// 	{
-			// 		if((temp2[k] == 14 || temp2[k] == 29) && k < temp3[1])
-			// 			col = true;
-
-			// 		if(temp2[k] == 0)
-			// 			break;
-			// 		fprintf(stderr, "%d ", temp2[k]);
-			// 	}
-			// 	fprintf(stderr, "\n");
-			// 	fprintf(stderr, "a: %d  b: %d\n\n", temp3[0], temp3[1]);
-			// 	if(row && col)
-			// 	{
-			// 		DEBUG_PRINT("v[i]: ", v[i]);
-			// 		DEBUG_PRINT("a[i]: ", a[i]);
-			// 	}
-			// }
 			OuterProductAdd(temp_row_indices[sID], temp_col_indices[sID], index_count[sID], sigma, stream);
+
+			for(int i=0; i<10; ++i)
+			{
+				int val1 = temp_row_indices[sID][i];
+				int val2 = temp_col_indices[sID][i];
+
+				fprintf(stderr, "row: %d  col: %d\n", val1, val2);
+			}
+			fprintf(stderr, "\n");
 		}
 	}
 
@@ -383,7 +332,8 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_primVoid_device(const cusp::array1
 
 	//r_prime
 	spmv(Body, accum_vf_vec[sID], Body_vec[sID], stream);
-	AccumVec<VALUE_TYPE> (r_prime, Body_vec[sID], stream);
+	//DEBUG_PRINT("Body_vec:  ", Body_vec[sID]);
+	AccumVec<VALUE_TYPE>(r_prime, Body_vec[sID], stream);
 	checkCudaErrors( cudaStreamSynchronize(stream) );
 }
 
@@ -413,7 +363,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::LoadMatrix(
 template <typename INDEX_TYPE, typename VALUE_TYPE, typename MEM_TYPE>
 void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::LoadMatrix(
 			cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src,
-			cusp::hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst)
+			hyb_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst)
 {
 	LoadHybMatrix_device(src, dst);
 }

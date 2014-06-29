@@ -1,0 +1,5 @@
+*~
+CFA
+src/CFA.o
+src/main.o
+lib/CFA.a

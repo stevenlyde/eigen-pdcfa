@@ -6,10 +6,10 @@ OMP=-fopenmp
 OPT=-O3
 DEBUG=-g -Wall -Wno-reorder
 CUDA_DEBUG=-g -G
-CUDA_CC_FLAGS=--generate-code arch=compute_20,code=sm_20 -Xcompiler -rdynamic -Xcompiler -fopenmp
-LD_LIBS=-lcuda -lcudart -lcublas -lrt -llapack 
+CUDA_CC_FLAGS=--generate-code arch=compute_30,code=sm_30 -Xcompiler -rdynamic -Xcompiler -fopenmp
+LD_LIBS=-lcuda -lcudart -lcublas -lrt -llapack -ldl 
 #LIB_INCLUDE=-L /usr/local/cuda/lib64
-CUDA_INCLUDE=-I ./include -I ./ -I ./cusp -I ./thrust -I /usr/local/cuda/include -I /usr/local/cuda/SDK/C/common/inc/
+CUDA_INCLUDE=-I ./include -I ./ -I ./cusp -I ./thrust -I /usr/local/cuda/include -I /usr/local/cuda/samples/common/inc
 PROJECT=CFA
 
 #default to debug builds for now

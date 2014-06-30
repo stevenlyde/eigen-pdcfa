@@ -375,7 +375,7 @@ OuterProductAdd_DELL(	const VALUE_TYPE *a,
 				if(valid)
 				{
 					int index = coo_column_indices[0]+1;
-					if(atomicCAS(&coo_column_indices[index], 0, b_col) == 0)
+					if(atomicCAS(&coo_column_indices[index], -1, b_col) == -1)
 					{
 						atomicAdd(&coo_column_indices[0], 1);
 						coo_row_indices[index] = row;

@@ -509,15 +509,8 @@ template <typename INDEX_TYPE, typename VALUE_TYPE>
 void LoadDellMatrix_device(	cusp::csr_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &src,
 							dell_matrix<INDEX_TYPE, VALUE_TYPE, cusp::device_memory> &dst)
 {
-	#define ROW_SIZE	64
-	dst.resize(src.num_rows, src.num_cols, src.num_entries, src.num_rows*ROW_SIZE, 256);
-
-	fprintf(stderr, "coo entries:\n");
-	for(int i=0; i<10; ++i)
-	{
-		int val = dst.coo.column_indices[i];
-		fprintf(stderr, "%d\n", val);
-	}
+	#define ROW_SIZE	1024
+	dst.resize(src.num_rows, src.num_cols, src.num_entries, src.num_rows*ROW_SIZE, 4096);
 
 	mat_info<INDEX_TYPE> infoDst;
 	get_matrix_info<VALUE_TYPE> (dst, infoDst);

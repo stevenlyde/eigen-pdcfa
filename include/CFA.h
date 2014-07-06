@@ -23,7 +23,7 @@
 #define CPU             0
 #define GPU             1
 //#define MULTI_GPU     2
-#define BUILD_TYPE      GPU         //0 is CPU 1 is GPU
+#define BUILD_TYPE      CPU         //0 is CPU 1 is GPU
 #define GPU_HYBRID      0
 #define GPU_DYNAMIC     1
 #define GPU_MATRIX      GPU_HYBRID

@@ -415,62 +415,20 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 			fprintf(stdout, "\n\nITERATION %d\n\n", iter);
 		}
 
-		int old_coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		int coo_size;
-
 		//if(ID == 1)
 			f_call();
-
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
-
 		//if(ID == 2)
 		 	f_list();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
-
 		//if(ID == 3)
 			f_set();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
 		//if(ID == 4)
 			f_if();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
 		//if(ID == 5)
 			f_primBool();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
 		//if(ID == 6)
 			f_primNum();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
 		//if(ID == 7)
 			f_primVoid();
-		coo_size = thrust::count_if(sigma.coo.column_indices.begin(), sigma.coo.column_indices.end(), is_positive());
-		if(old_coo_size != coo_size)
-		{
-			fprintf(stderr, "*** new coo size: %d\n", coo_size);	
-		}
-
 
 		if(ID == 0 && iter % ITER_COUNT == 0)
 		{
@@ -529,12 +487,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 	//#pragma omp barrier
 	} while(r_change || sigma_change);
 	
-	//cusp::print(sigma.row_sizes);
-	int sum = thrust::reduce(sigma.row_sizes.begin(), sigma.row_sizes.end());
-	fprintf(stderr, "sum: %d\n", sum);
-	cusp::print(sigma.coo.column_indices);
-	cusp::print(sigma.coo.row_indices);
-
 	fprintf(stdout, "Analysis Complete...\n");
 }
 

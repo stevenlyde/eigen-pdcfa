@@ -108,9 +108,11 @@ struct dell_matrix         //dynamic ELL matrix
         row_offsetsA.resize(rows+1,0);
         row_offsetsB.resize(rows+1,0);
         row_sizes.resize(rows,0);
-        coo.resize(rows, cols, coo_size);
 		coo.row_indices.resize(coo_size,-1);
 		coo.column_indices.resize(coo_size,-1);
+        coo.resize(rows, cols, coo_size);
+        coo.row_indices[0] = 0;
+        coo.column_indices[0] = 0;
 
         row_offsets = &row_offsetsA;
         column_indices = &column_indicesA;

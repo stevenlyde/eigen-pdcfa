@@ -30,15 +30,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call_device(const cusp::array1d<VA
 			gather_reduce(v[i], temp_row_indices[sID], index_count[sID], 0, stream);
 			gather_reduce(a[i], temp_col_indices[sID], index_count[sID], 1, stream);
 			OuterProductAdd(temp_row_indices[sID], temp_col_indices[sID], index_count[sID], sigma, stream);
-
-			for(int i=0; i<10; ++i)
-			{
-				int val1 = temp_row_indices[sID][i];
-				int val2 = temp_col_indices[sID][i];
-
-				fprintf(stderr, "row: %d  col: %d\n", val1, val2);
-			}
-			fprintf(stderr, "\n");
 		}
 	}
 
@@ -62,15 +53,6 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::f_call()
 			checkCudaErrors( cudaStreamSynchronize(stream) );
 
 			fprintf(stderr, "f_call_%d: %d\n", j, entry_count_host[STREAM_CALL]);
-			//DEBUG
-			cusp::array1d<VALUE_TYPE, MEM_TYPE> temp = s[STREAM_CALL];
-			for(int i=0; i<temp.size(); ++i)
-			{
-				VALUE_TYPE val = temp[i];
-				if(debug && val == 1)
-					fprintf(stderr, "s: %d\n", i);
-			}
-			//DEBUG
 			if(entry_count_host[STREAM_CALL] > 0)
 				f_call_device(s[STREAM_CALL], j, STREAM_CALL, stream);
 		}

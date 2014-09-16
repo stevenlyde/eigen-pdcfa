@@ -403,7 +403,7 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 	fprintf(stderr, "m_maxCall: %d  m_maxList: %d\n", m_maxCall, m_maxList);
 	#define ITER_COUNT	5
 
-	//#pragma omp parallel num_threads(NUM_STREAMS)
+	#pragma omp parallel num_threads(NUM_STREAMS)
 	do
 	{
 		int ID = omp_get_thread_num();
@@ -415,19 +415,19 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 			fprintf(stdout, "\n\nITERATION %d\n\n", iter);
 		}
 
-		//if(ID == 1)
+		if(ID == 1)
 			f_call();
-		//if(ID == 2)
+		if(ID == 2)
 		 	f_list();
-		//if(ID == 3)
+		if(ID == 3)
 			f_set();
-		//if(ID == 4)
+		if(ID == 4)
 			f_if();
-		//if(ID == 5)
+		if(ID == 5)
 			f_primBool();
-		//if(ID == 6)
+		if(ID == 6)
 			f_primNum();
-		//if(ID == 7)
+		if(ID == 7)
 			f_primVoid();
 
 		if(ID == 0 && iter % ITER_COUNT == 0)
@@ -484,9 +484,9 @@ void CFA<INDEX_TYPE, VALUE_TYPE, MEM_TYPE>::Run_Analysis()
 		#endif
 		}
 
-	//#pragma omp barrier
+	#pragma omp barrier
 	} while(r_change || sigma_change);
-	
+
 	fprintf(stdout, "Analysis Complete...\n");
 }
 
